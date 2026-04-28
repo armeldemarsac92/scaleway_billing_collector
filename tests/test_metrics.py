@@ -3,10 +3,16 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from billing_collector.collection.differ import SnapshotDiffer
-from billing_collector.domain.models import BillingLine, Snapshot
+from billing_collector.collection.differ import TaxSnapshotDiffer
+from billing_collector.domain.models import BillingLine, Snapshot, TaxLine, TaxSnapshot
 from billing_collector.metrics.collector import PrometheusMetricsCollector
 from billing_collector.storage.database import SQLiteDatabase
-from billing_collector.storage.repositories import DailyDeltaRepository, SnapshotRepository
+from billing_collector.storage.repositories import (
+    DailyDeltaRepository,
+    SnapshotRepository,
+    TaxDeltaRepository,
+    TaxSnapshotRepository,
+)
 
 
 def _line(**overrides):
@@ -39,6 +45,8 @@ class MetricsTests(TestCase):
         self.database.initialize()
         self.snapshots = SnapshotRepository(self.database)
         self.deltas = DailyDeltaRepository(self.database)
+        self.tax_snapshots = TaxSnapshotRepository(self.database)
+        self.tax_deltas = TaxDeltaRepository(self.database)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -79,3 +87,50 @@ class MetricsTests(TestCase):
         self.assertIn("scaleway_billing_billed_quantity_total", output)
         self.assertIn(" 25", output)
 
+    def test_renders_tax_counters(self):
+        previous = TaxSnapshot.now(
+            billing_period="2026-04",
+            organization_id="org-a",
+            lines=[
+                TaxLine(
+                    billing_period="2026-04",
+                    organization_id="org-a",
+                    description="VAT",
+                    currency="EUR",
+                    rate=Decimal("0.2"),
+                    total_tax_value=Decimal("10"),
+                )
+            ],
+        )
+        current = TaxSnapshot.now(
+            billing_period="2026-04",
+            organization_id="org-a",
+            lines=[
+                TaxLine(
+                    billing_period="2026-04",
+                    organization_id="org-a",
+                    description="VAT",
+                    currency="EUR",
+                    rate=Decimal("0.2"),
+                    total_tax_value=Decimal("12.50"),
+                )
+            ],
+        )
+        previous_id = self.tax_snapshots.save(previous)
+        current_id = self.tax_snapshots.save(current)
+        self.tax_deltas.upsert_many(
+            TaxSnapshotDiffer().diff(
+                billing_day="2026-04-28",
+                current=current,
+                previous=previous,
+            ),
+            current_tax_snapshot_id=current_id,
+            previous_tax_snapshot_id=previous_id,
+        )
+
+        output = PrometheusMetricsCollector(self.deltas, self.tax_deltas).render()
+
+        self.assertIn("scaleway_billing_tax_euros_total", output)
+        self.assertIn('organization_id="org-a"', output)
+        self.assertIn('rate="0.2"', output)
+        self.assertIn(" 2.5", output)

@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from billing_collector.domain.fingerprints import line_fingerprint
-from billing_collector.domain.models import BillingLine, DailyDelta, Snapshot
+from billing_collector.domain.fingerprints import line_fingerprint, tax_fingerprint
+from billing_collector.domain.models import (
+    BillingLine,
+    DailyDelta,
+    Snapshot,
+    TaxDailyDelta,
+    TaxLine,
+    TaxSnapshot,
+)
 
 
 class SnapshotDiffer:
@@ -76,3 +83,50 @@ class SnapshotDiffer:
             return None
         return current - previous
 
+
+class TaxSnapshotDiffer:
+    def diff(
+        self,
+        *,
+        billing_day: str,
+        current: TaxSnapshot,
+        previous: TaxSnapshot | None,
+    ) -> list[TaxDailyDelta]:
+        if previous is None:
+            return []
+        if current.billing_period != previous.billing_period:
+            return []
+
+        current_by_key = self._index(current.lines)
+        previous_by_key = self._index(previous.lines)
+        fingerprints = sorted(set(current_by_key) | set(previous_by_key))
+
+        deltas: list[TaxDailyDelta] = []
+        for fingerprint in fingerprints:
+            current_line = current_by_key.get(fingerprint)
+            previous_line = previous_by_key.get(fingerprint)
+            reference_line = current_line or previous_line
+            if reference_line is None:
+                continue
+            current_value = current_line.total_tax_value if current_line else Decimal("0")
+            previous_value = previous_line.total_tax_value if previous_line else Decimal("0")
+            delta_value = current_value - previous_value
+            if delta_value == 0:
+                continue
+            deltas.append(
+                TaxDailyDelta(
+                    billing_day=billing_day,
+                    billing_period=current.billing_period,
+                    organization_id=reference_line.organization_id,
+                    description=reference_line.description,
+                    currency=reference_line.currency,
+                    rate=reference_line.rate,
+                    delta_value=delta_value,
+                    line_fingerprint=fingerprint,
+                )
+            )
+
+        return deltas
+
+    def _index(self, lines: tuple[TaxLine, ...]) -> dict[str, TaxLine]:
+        return {tax_fingerprint(line): line for line in lines}

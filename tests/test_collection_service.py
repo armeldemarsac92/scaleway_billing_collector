@@ -4,19 +4,23 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from billing_collector.collection.service import BillingCollectionService, CollectionSettings
-from billing_collector.domain.models import BillingLine, Project, Snapshot, TaxSnapshot
+from billing_collector.domain.models import BillingLine, Project, Snapshot, TaxLine, TaxSnapshot
 from billing_collector.storage.database import SQLiteDatabase
 from billing_collector.storage.repositories import (
     DailyDeltaRepository,
     ProjectRepository,
     SnapshotRepository,
+    TaxDeltaRepository,
+    TaxSnapshotRepository,
 )
 
 
 class FakeBillingClient:
     def __init__(self):
         self.calls: list[tuple[str, str | None, str | None]] = []
+        self.tax_calls: list[str] = []
         self.values: dict[tuple[str, str, str | None], Decimal] = {}
+        self.tax_values: dict[str, Decimal] = {}
 
     def list_projects(self) -> list[Project]:
         return [
@@ -55,10 +59,20 @@ class FakeBillingClient:
         )
 
     def list_taxes(self, *, billing_period: str, organization_id: str) -> TaxSnapshot:
+        self.tax_calls.append(billing_period)
         return TaxSnapshot.now(
             billing_period=billing_period,
             organization_id=organization_id,
-            lines=[],
+            lines=[
+                TaxLine(
+                    billing_period=billing_period,
+                    organization_id=organization_id,
+                    description="VAT",
+                    currency="EUR",
+                    rate=Decimal("0.2"),
+                    total_tax_value=self.tax_values.get(billing_period, Decimal("0")),
+                )
+            ],
         )
 
 
@@ -71,11 +85,15 @@ class CollectionServiceTests(TestCase):
         self.projects = ProjectRepository(self.database)
         self.snapshots = SnapshotRepository(self.database)
         self.deltas = DailyDeltaRepository(self.database)
+        self.tax_snapshots = TaxSnapshotRepository(self.database)
+        self.tax_deltas = TaxDeltaRepository(self.database)
         self.service = BillingCollectionService(
             client=self.client,
             project_repository=self.projects,
             snapshot_repository=self.snapshots,
             delta_repository=self.deltas,
+            tax_snapshot_repository=self.tax_snapshots,
+            tax_delta_repository=self.tax_deltas,
         )
 
     def tearDown(self):
@@ -88,12 +106,16 @@ class CollectionServiceTests(TestCase):
             category_names=("Compute",),
         )
         self.client.values[("2026-04", "project-a", "Compute")] = Decimal("10")
+        self.client.tax_values["2026-04"] = Decimal("2")
         first = self.service.collect(settings=settings, day=date(2026, 4, 28))
         self.client.values[("2026-04", "project-a", "Compute")] = Decimal("12.50")
+        self.client.tax_values["2026-04"] = Decimal("2.50")
         second = self.service.collect(settings=settings, day=date(2026, 4, 28))
 
         self.assertEqual(first.deltas_saved, 0)
+        self.assertEqual(first.tax_deltas_saved, 0)
         self.assertEqual(second.deltas_saved, 1)
+        self.assertEqual(second.tax_deltas_saved, 1)
         self.assertEqual(self.deltas.count(), 1)
         self.assertEqual(
             self.client.calls,
@@ -105,6 +127,7 @@ class CollectionServiceTests(TestCase):
         counters = self.deltas.counter_values()
         self.assertEqual(counters[0].project_name, "Project A")
         self.assertEqual(counters[0].value, Decimal("2.5"))
+        self.assertEqual(self.tax_deltas.counter_values()[0].value, Decimal("0.5"))
 
     def test_collect_backfills_previous_period_during_first_days(self):
         settings = CollectionSettings(
@@ -122,4 +145,3 @@ class CollectionServiceTests(TestCase):
                 ("2026-03", "project-a", None),
             ],
         )
-

@@ -77,6 +77,26 @@ class TaxSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class TaxDailyDelta:
+    billing_day: str
+    billing_period: str
+    organization_id: str
+    description: str
+    currency: str
+    rate: Decimal | None
+    delta_value: Decimal
+    line_fingerprint: str
+
+    @property
+    def kind(self) -> str:
+        return "tax" if self.delta_value >= 0 else "tax_credit"
+
+    @property
+    def absolute_value(self) -> Decimal:
+        return abs(self.delta_value)
+
+
+@dataclass(frozen=True, slots=True)
 class DailyDelta:
     billing_day: str
     billing_period: str

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from billing_collector.collection.differ import SnapshotDiffer
+from billing_collector.collection.differ import SnapshotDiffer, TaxSnapshotDiffer
 from billing_collector.collection.periods import collection_window, utc_today
 from billing_collector.domain.models import BillingLine, Project, Snapshot
 from billing_collector.scaleway.client import BillingClient
@@ -12,6 +12,8 @@ from billing_collector.storage.repositories import (
     ProjectRepository,
     SnapshotRepository,
     SnapshotScope,
+    TaxDeltaRepository,
+    TaxSnapshotRepository,
 )
 
 
@@ -29,6 +31,8 @@ class CollectionResult:
     projects_seen: int = 0
     snapshots_saved: int = 0
     deltas_saved: int = 0
+    tax_snapshots_saved: int = 0
+    tax_deltas_saved: int = 0
 
 
 class BillingCollectionService:
@@ -39,13 +43,19 @@ class BillingCollectionService:
         project_repository: ProjectRepository,
         snapshot_repository: SnapshotRepository,
         delta_repository: DailyDeltaRepository,
+        tax_snapshot_repository: TaxSnapshotRepository | None = None,
+        tax_delta_repository: TaxDeltaRepository | None = None,
         differ: SnapshotDiffer | None = None,
+        tax_differ: TaxSnapshotDiffer | None = None,
     ) -> None:
         self.client = client
         self.project_repository = project_repository
         self.snapshot_repository = snapshot_repository
         self.delta_repository = delta_repository
+        self.tax_snapshot_repository = tax_snapshot_repository
+        self.tax_delta_repository = tax_delta_repository
         self.differ = differ or SnapshotDiffer()
+        self.tax_differ = tax_differ or TaxSnapshotDiffer()
 
     def collect(
         self,
@@ -63,6 +73,8 @@ class BillingCollectionService:
 
         snapshots_saved = 0
         deltas_saved = 0
+        tax_snapshots_saved = 0
+        tax_deltas_saved = 0
         for billing_period in window.billing_periods:
             for project in projects:
                 categories = settings.category_names or (None,)
@@ -106,10 +118,20 @@ class BillingCollectionService:
                     )
                     deltas_saved += len(deltas)
 
+            tax_result = self._collect_taxes(
+                organization_id=settings.organization_id,
+                billing_period=billing_period,
+                billing_day=window.billing_day,
+            )
+            tax_snapshots_saved += tax_result[0]
+            tax_deltas_saved += tax_result[1]
+
         return CollectionResult(
             projects_seen=len(projects),
             snapshots_saved=snapshots_saved,
             deltas_saved=deltas_saved,
+            tax_snapshots_saved=tax_snapshots_saved,
+            tax_deltas_saved=tax_deltas_saved,
         )
 
     def _target_projects(self, settings: CollectionSettings) -> list[Project]:
@@ -142,3 +164,33 @@ class BillingCollectionService:
             billed_quantity=line.billed_quantity,
         )
 
+    def _collect_taxes(
+        self,
+        *,
+        organization_id: str,
+        billing_period: str,
+        billing_day: str,
+    ) -> tuple[int, int]:
+        if self.tax_snapshot_repository is None or self.tax_delta_repository is None:
+            return (0, 0)
+        snapshot = self.client.list_taxes(
+            billing_period=billing_period,
+            organization_id=organization_id,
+        )
+        snapshot_id = self.tax_snapshot_repository.save(snapshot)
+        previous = self.tax_snapshot_repository.previous(
+            billing_period=billing_period,
+            organization_id=organization_id,
+            before_snapshot_id=snapshot_id,
+        )
+        deltas = self.tax_differ.diff(
+            billing_day=billing_day,
+            current=snapshot,
+            previous=previous.snapshot if previous else None,
+        )
+        self.tax_delta_repository.upsert_many(
+            deltas,
+            current_tax_snapshot_id=snapshot_id,
+            previous_tax_snapshot_id=previous.id if previous else None,
+        )
+        return (1, len(deltas))

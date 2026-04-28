@@ -107,5 +107,53 @@ ON daily_deltas (
     unit,
     currency
 );
-"""
 
+CREATE TABLE IF NOT EXISTS tax_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    billing_period TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    organization_id TEXT NOT NULL,
+    raw_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tax_snapshots_scope
+ON tax_snapshots (billing_period, organization_id, id);
+
+CREATE TABLE IF NOT EXISTS tax_snapshot_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tax_snapshot_id INTEGER NOT NULL REFERENCES tax_snapshots(id) ON DELETE CASCADE,
+    billing_period TEXT NOT NULL,
+    organization_id TEXT NOT NULL,
+    description TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    rate TEXT,
+    total_tax_value TEXT NOT NULL,
+    line_fingerprint TEXT NOT NULL,
+    raw_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tax_snapshot_lines_snapshot
+ON tax_snapshot_lines (tax_snapshot_id);
+
+CREATE TABLE IF NOT EXISTS tax_daily_deltas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    billing_day TEXT NOT NULL,
+    billing_period TEXT NOT NULL,
+    organization_id TEXT NOT NULL,
+    description TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    rate TEXT,
+    delta_euros TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    line_fingerprint TEXT NOT NULL,
+    current_tax_snapshot_id INTEGER NOT NULL REFERENCES tax_snapshots(id),
+    previous_tax_snapshot_id INTEGER REFERENCES tax_snapshots(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (billing_day, billing_period, line_fingerprint, kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tax_daily_deltas_counter
+ON tax_daily_deltas (kind, organization_id, description, currency, rate);
+"""

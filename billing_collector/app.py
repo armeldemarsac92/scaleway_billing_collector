@@ -13,6 +13,8 @@ from billing_collector.storage.repositories import (
     DailyDeltaRepository,
     ProjectRepository,
     SnapshotRepository,
+    TaxDeltaRepository,
+    TaxSnapshotRepository,
 )
 
 
@@ -24,6 +26,8 @@ class Application:
     project_repository: ProjectRepository
     snapshot_repository: SnapshotRepository
     delta_repository: DailyDeltaRepository
+    tax_snapshot_repository: TaxSnapshotRepository
+    tax_delta_repository: TaxDeltaRepository
     collection_service: BillingCollectionService
     metrics_collector: PrometheusMetricsCollector
 
@@ -39,13 +43,17 @@ class Application:
         project_repository = ProjectRepository(database)
         snapshot_repository = SnapshotRepository(database)
         delta_repository = DailyDeltaRepository(database)
+        tax_snapshot_repository = TaxSnapshotRepository(database)
+        tax_delta_repository = TaxDeltaRepository(database)
         collection_service = BillingCollectionService(
             client=client,
             project_repository=project_repository,
             snapshot_repository=snapshot_repository,
             delta_repository=delta_repository,
+            tax_snapshot_repository=tax_snapshot_repository,
+            tax_delta_repository=tax_delta_repository,
         )
-        metrics_collector = PrometheusMetricsCollector(delta_repository)
+        metrics_collector = PrometheusMetricsCollector(delta_repository, tax_delta_repository)
         return cls(
             settings=settings,
             database=database,
@@ -53,6 +61,8 @@ class Application:
             project_repository=project_repository,
             snapshot_repository=snapshot_repository,
             delta_repository=delta_repository,
+            tax_snapshot_repository=tax_snapshot_repository,
+            tax_delta_repository=tax_delta_repository,
             collection_service=collection_service,
             metrics_collector=metrics_collector,
         )
