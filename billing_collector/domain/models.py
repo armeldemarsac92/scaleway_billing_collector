@@ -44,6 +44,39 @@ class Snapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class TaxLine:
+    billing_period: str
+    organization_id: str
+    description: str
+    currency: str
+    rate: Decimal | None
+    total_tax_value: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class TaxSnapshot:
+    billing_period: str
+    observed_at: datetime
+    organization_id: str
+    lines: tuple[TaxLine, ...]
+
+    @classmethod
+    def now(
+        cls,
+        *,
+        billing_period: str,
+        organization_id: str,
+        lines: list[TaxLine],
+    ) -> "TaxSnapshot":
+        return cls(
+            billing_period=billing_period,
+            observed_at=datetime.now(UTC),
+            organization_id=organization_id,
+            lines=tuple(lines),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class DailyDelta:
     billing_day: str
     billing_period: str
@@ -67,4 +100,3 @@ class DailyDelta:
     @property
     def absolute_value(self) -> Decimal:
         return abs(self.delta_value)
-
