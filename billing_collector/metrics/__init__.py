@@ -1,0 +1,2 @@
+"""Prometheus metric rendering."""
+
