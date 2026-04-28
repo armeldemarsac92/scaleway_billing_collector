@@ -15,6 +15,7 @@ DEFAULT_DATABASE_PATH = "/data/billing-collector.sqlite3"
 DEFAULT_BIND_HOST = "0.0.0.0"
 DEFAULT_BIND_PORT = 9503
 DEFAULT_PREVIOUS_PERIOD_BACKFILL_DAYS = 7
+DEFAULT_COLLECTION_INTERVAL_SECONDS = 86_400
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,8 @@ class Settings:
     project_ids: tuple[str, ...] = ()
     category_names: tuple[str, ...] = ()
     previous_period_backfill_days: int = DEFAULT_PREVIOUS_PERIOD_BACKFILL_DAYS
+    collection_interval_seconds: int = DEFAULT_COLLECTION_INTERVAL_SECONDS
+    collect_on_start: bool = True
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -59,4 +62,12 @@ class Settings:
                     str(DEFAULT_PREVIOUS_PERIOD_BACKFILL_DAYS),
                 )
             ),
+            collection_interval_seconds=int(
+                os.getenv(
+                    "BILLING_COLLECTOR_COLLECTION_INTERVAL_SECONDS",
+                    str(DEFAULT_COLLECTION_INTERVAL_SECONDS),
+                )
+            ),
+            collect_on_start=os.getenv("BILLING_COLLECTOR_COLLECT_ON_START", "true").lower()
+            in {"1", "true", "yes", "on"},
         )

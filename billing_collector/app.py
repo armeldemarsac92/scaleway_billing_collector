@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from billing_collector.collection.service import BillingCollectionService, CollectionSettings
+from billing_collector.collection.scheduler import IntervalScheduler
 from billing_collector.config import Settings
 from billing_collector.metrics.collector import PrometheusMetricsCollector
 from billing_collector.metrics.server import MetricsServer
@@ -68,9 +69,14 @@ class Application:
         )
 
     def serve(self) -> None:
+        scheduler = IntervalScheduler(
+            job=self.collect_once,
+            interval_seconds=self.settings.collection_interval_seconds,
+            run_on_start=self.settings.collect_on_start,
+        )
+        scheduler.start()
         MetricsServer(
             host=self.settings.bind_host,
             port=self.settings.bind_port,
             collector=self.metrics_collector,
         ).serve_forever()
-

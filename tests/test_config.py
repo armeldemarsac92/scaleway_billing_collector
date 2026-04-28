@@ -14,6 +14,7 @@ class SettingsTests(TestCase):
                 "BILLING_COLLECTOR_PROJECT_IDS": "project-a, project-b",
                 "BILLING_COLLECTOR_CATEGORY_NAMES": "Compute,Storage",
                 "BILLING_COLLECTOR_BIND_PORT": "9600",
+                "BILLING_COLLECTOR_COLLECT_ON_START": "false",
             },
             clear=True,
         ):
@@ -24,9 +25,9 @@ class SettingsTests(TestCase):
         self.assertEqual(settings.project_ids, ("project-a", "project-b"))
         self.assertEqual(settings.category_names, ("Compute", "Storage"))
         self.assertEqual(settings.bind_port, 9600)
+        self.assertFalse(settings.collect_on_start)
 
     def test_settings_reports_missing_required_environment(self):
         with patch.dict("os.environ", {}, clear=True):
             with self.assertRaisesRegex(ValueError, "SCW_SECRET_KEY"):
                 Settings.from_env()
-
