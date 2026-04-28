@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scaleway-billing-collector
+  namespace: monitoring
+  labels:
+    app: scaleway-billing-collector
+data:
+  BILLING_COLLECTOR_DATABASE_PATH: /data/billing-collector.sqlite3
+  BILLING_COLLECTOR_BIND_HOST: "0.0.0.0"
+  BILLING_COLLECTOR_BIND_PORT: "9503"
+  BILLING_COLLECTOR_PREVIOUS_PERIOD_BACKFILL_DAYS: "7"
+  BILLING_COLLECTOR_COLLECTION_INTERVAL_SECONDS: "86400"
+  BILLING_COLLECTOR_COLLECT_ON_START: "true"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scaleway-billing-collector-data
+  namespace: monitoring
+  labels:
+    app: scaleway-billing-collector
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scaleway-billing-collector
+  namespace: monitoring
+  labels:
+    app: scaleway-billing-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scaleway-billing-collector
+  template:
+    metadata:
+      labels:
+        app: scaleway-billing-collector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: collector
+          image: ghcr.io/armeldemarsac92/scaleway_billing_collector:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 9503
+          envFrom:
+            - configMapRef:
+                name: scaleway-billing-collector
+            - secretRef:
+                name: scaleway-billing-collector
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: scaleway-billing-collector-data
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scaleway-billing-collector
+  namespace: monitoring
+  labels:
+    app: scaleway-billing-collector
+spec:
+  selector:
+    app: scaleway-billing-collector
+  ports:
+    - name: metrics
+      port: 9503
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: scaleway-billing-collector
+  namespace: monitoring
+  labels:
+    app: scaleway-billing-collector
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: scaleway-billing-collector
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s
+
