@@ -1,7 +1,7 @@
 import time
 from unittest import TestCase
 
-from billing_collector.collection.scheduler import IntervalScheduler
+from billing_collector.infrastructure.scheduling.interval_scheduler import IntervalScheduler
 
 
 class IntervalSchedulerTests(TestCase):
@@ -18,4 +18,3 @@ class IntervalSchedulerTests(TestCase):
         scheduler.stop()
 
         self.assertEqual(calls, [1])
-

@@ -1,0 +1,2 @@
+"""Scaleway billing provider adapters."""
+

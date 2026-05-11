@@ -2,6 +2,9 @@
 
 These queries assume Grafana queries Prometheus or Thanos.
 
+Historical SQLite seed rows are intentionally excluded from Prometheus counters. These
+queries show live collector time series from the moment Prometheus starts scraping.
+
 ## Net Cost Over Dashboard Range
 
 ```promql
@@ -46,6 +49,8 @@ sum by (project_name) (
 )
 ```
 
+Use a 1 day panel step or bar interval for daily cost evolution.
+
 ## Organization-Level Taxes
 
 ```promql
@@ -63,4 +68,3 @@ sum by (sku, unit) (
   increase(scaleway_billing_billed_quantity_total[$__range])
 )
 ```
-

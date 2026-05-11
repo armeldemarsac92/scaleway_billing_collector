@@ -1,2 +1,0 @@
-"""Scaleway API adapters."""
-

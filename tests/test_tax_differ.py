@@ -1,7 +1,7 @@
 from decimal import Decimal
 from unittest import TestCase
 
-from billing_collector.collection.differ import TaxSnapshotDiffer
+from billing_collector.domain.differ import TaxSnapshotDiffer
 from billing_collector.domain.models import TaxLine, TaxSnapshot
 
 
@@ -53,4 +53,3 @@ class TaxDifferTests(TestCase):
         self.assertEqual(len(deltas), 1)
         self.assertEqual(deltas[0].delta_value, Decimal("2.50"))
         self.assertEqual(deltas[0].kind, "tax")
-

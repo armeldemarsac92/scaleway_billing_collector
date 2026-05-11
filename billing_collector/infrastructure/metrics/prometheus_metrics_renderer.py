@@ -2,25 +2,24 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from billing_collector.storage.repositories import (
-    CounterValue,
-    DailyDeltaRepository,
+from billing_collector.application.ports.repositories import (
+    BillingCounterReader,
+    BillingCounterValue,
+    TaxCounterReader,
     TaxCounterValue,
-    TaxDeltaRepository,
 )
 
 
-class PrometheusMetricsCollector:
+class PrometheusMetricsRenderer:
     def __init__(
         self,
-        delta_repository: DailyDeltaRepository,
-        tax_delta_repository: TaxDeltaRepository | None = None,
+        billing_counter_reader: BillingCounterReader,
+        tax_counter_reader: TaxCounterReader | None = None,
     ) -> None:
-        self.delta_repository = delta_repository
-        self.tax_delta_repository = tax_delta_repository
+        self.billing_counter_reader = billing_counter_reader
+        self.tax_counter_reader = tax_counter_reader
 
     def render(self) -> str:
-        counters = self.delta_repository.counter_values()
         lines: list[str] = [
             "# HELP scaleway_billing_cost_euros_total Reconstructed cumulative Scaleway billing costs in euros.",
             "# TYPE scaleway_billing_cost_euros_total counter",
@@ -34,33 +33,35 @@ class PrometheusMetricsCollector:
             "# TYPE scaleway_billing_tax_credit_euros_total counter",
         ]
 
-        for counter in counters:
-            metric_name = self._metric_name(counter)
+        for counter in self.billing_counter_reader.list_billing_counters():
+            metric_name = self._billing_metric_name(counter)
             lines.append(
-                f"{metric_name}{self._labels(counter)} {self._format_decimal(counter.value)}"
+                f"{metric_name}{self._billing_labels(counter)} "
+                f"{self._format_decimal(counter.value)}"
             )
             if counter.quantity is not None and counter.quantity >= 0:
                 lines.append(
                     "scaleway_billing_billed_quantity_total"
-                    f"{self._labels(counter)} {self._format_decimal(counter.quantity)}"
+                    f"{self._billing_labels(counter)} {self._format_decimal(counter.quantity)}"
                 )
 
-        if self.tax_delta_repository is not None:
-            for counter in self.tax_delta_repository.counter_values():
+        if self.tax_counter_reader is not None:
+            for counter in self.tax_counter_reader.list_tax_counters():
                 metric_name = self._tax_metric_name(counter)
                 lines.append(
-                    f"{metric_name}{self._tax_labels(counter)} {self._format_decimal(counter.value)}"
+                    f"{metric_name}{self._tax_labels(counter)} "
+                    f"{self._format_decimal(counter.value)}"
                 )
 
         lines.append("")
         return "\n".join(lines)
 
-    def _metric_name(self, counter: CounterValue) -> str:
+    def _billing_metric_name(self, counter: BillingCounterValue) -> str:
         if counter.kind == "credit":
             return "scaleway_billing_credit_euros_total"
         return "scaleway_billing_cost_euros_total"
 
-    def _labels(self, counter: CounterValue) -> str:
+    def _billing_labels(self, counter: BillingCounterValue) -> str:
         labels = {
             "project_id": counter.project_id,
             "project_name": counter.project_name or "",
@@ -72,10 +73,7 @@ class PrometheusMetricsCollector:
             "unit": counter.unit,
             "currency": counter.currency,
         }
-        rendered = ",".join(
-            f'{name}="{self._escape_label_value(value)}"' for name, value in labels.items()
-        )
-        return f"{{{rendered}}}"
+        return self._render_labels(labels)
 
     def _tax_metric_name(self, counter: TaxCounterValue) -> str:
         if counter.kind == "tax_credit":
@@ -89,6 +87,9 @@ class PrometheusMetricsCollector:
             "currency": counter.currency,
             "rate": str(counter.rate) if counter.rate is not None else "",
         }
+        return self._render_labels(labels)
+
+    def _render_labels(self, labels: dict[str, str]) -> str:
         rendered = ",".join(
             f'{name}="{self._escape_label_value(value)}"' for name, value in labels.items()
         )
@@ -99,3 +100,4 @@ class PrometheusMetricsCollector:
 
     def _format_decimal(self, value: Decimal) -> str:
         return format(value.normalize(), "f")
+

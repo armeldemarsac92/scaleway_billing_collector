@@ -4,8 +4,8 @@ from unittest import TestCase
 
 import httpx
 
-from billing_collector.scaleway.client import BillingAuthenticationError
-from billing_collector.scaleway.rest_client import ScalewayRestBillingClient
+from billing_collector.application.ports.billing import BillingProviderAuthenticationError
+from billing_collector.infrastructure.scaleway.rest_billing_client import ScalewayRestBillingClient
 
 
 class ScalewayRestBillingClientTests(TestCase):
@@ -129,6 +129,5 @@ class ScalewayRestBillingClientTests(TestCase):
             ),
         )
 
-        with self.assertRaises(BillingAuthenticationError):
+        with self.assertRaises(BillingProviderAuthenticationError):
             client.list_projects()
-

@@ -39,3 +39,4 @@ class IntervalScheduler:
             self.job()
         except Exception:
             LOGGER.exception("scheduled billing collection failed")
+

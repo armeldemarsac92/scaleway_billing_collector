@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Protocol
 
-from billing_collector.metrics.collector import PrometheusMetricsCollector
+
+class MetricsRenderer(Protocol):
+    def render(self) -> str:
+        ...
 
 
 class MetricsServer:
@@ -11,11 +15,11 @@ class MetricsServer:
         *,
         host: str,
         port: int,
-        collector: PrometheusMetricsCollector,
+        metrics_renderer: MetricsRenderer,
     ) -> None:
         self.host = host
         self.port = port
-        self.collector = collector
+        self.metrics_renderer = metrics_renderer
         self.httpd = ThreadingHTTPServer((host, port), self._handler())
 
     def serve_forever(self) -> None:
@@ -25,7 +29,7 @@ class MetricsServer:
         self.httpd.shutdown()
 
     def _handler(self) -> type[BaseHTTPRequestHandler]:
-        collector = self.collector
+        metrics_renderer = self.metrics_renderer
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
@@ -40,7 +44,7 @@ class MetricsServer:
                     return
                 self._write(
                     200,
-                    collector.render(),
+                    metrics_renderer.render(),
                     "text/plain; version=0.0.4; charset=utf-8",
                 )
 
@@ -56,4 +60,3 @@ class MetricsServer:
                 self.wfile.write(encoded)
 
         return Handler
-

@@ -5,22 +5,24 @@ from typing import Protocol
 from billing_collector.domain.models import Project, Snapshot, TaxSnapshot
 
 
-class BillingClientError(RuntimeError):
-    pass
+class BillingProviderError(RuntimeError):
+    """Base error raised by billing provider adapters."""
 
 
-class BillingAuthenticationError(BillingClientError):
-    pass
+class BillingProviderAuthenticationError(BillingProviderError):
+    """Raised when the billing provider rejects credentials."""
 
 
-class BillingRateLimitError(BillingClientError):
-    pass
+class BillingProviderRateLimitError(BillingProviderError):
+    """Raised when the billing provider asks the collector to slow down."""
 
 
-class BillingClient(Protocol):
+class ProjectReader(Protocol):
     def list_projects(self) -> list[Project]:
         ...
 
+
+class ConsumptionReader(Protocol):
     def list_consumption(
         self,
         *,
@@ -30,6 +32,8 @@ class BillingClient(Protocol):
     ) -> Snapshot:
         ...
 
+
+class TaxReader(Protocol):
     def list_taxes(
         self,
         *,

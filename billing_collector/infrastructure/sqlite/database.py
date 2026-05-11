@@ -17,6 +17,17 @@ class SQLiteDatabase:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            self._migrate(connection)
+
+    def _migrate(self, connection: sqlite3.Connection) -> None:
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(tax_snapshots)").fetchall()
+        }
+        if "source" not in columns:
+            connection.execute(
+                "ALTER TABLE tax_snapshots ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'"
+            )
 
 
 SCHEMA = """
@@ -113,6 +124,7 @@ CREATE TABLE IF NOT EXISTS tax_snapshots (
     billing_period TEXT NOT NULL,
     observed_at TEXT NOT NULL,
     organization_id TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'unknown',
     raw_json TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -156,4 +168,10 @@ CREATE TABLE IF NOT EXISTS tax_daily_deltas (
 
 CREATE INDEX IF NOT EXISTS idx_tax_daily_deltas_counter
 ON tax_daily_deltas (kind, organization_id, description, currency, rate);
+
+CREATE TABLE IF NOT EXISTS collector_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """

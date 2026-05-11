@@ -11,12 +11,13 @@ RUN adduser --disabled-password --gecos "" appuser \
 
 COPY pyproject.toml README.md ./
 COPY billing_collector ./billing_collector
+COPY scripts/seed-history.sh /usr/local/bin/billing-collector-seed-history
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+    && chmod +x /usr/local/bin/billing-collector-seed-history
 
 USER appuser
 
 EXPOSE 9503
 
 CMD ["billing-collector", "serve"]
-

@@ -16,6 +16,7 @@ DEFAULT_BIND_HOST = "0.0.0.0"
 DEFAULT_BIND_PORT = 9503
 DEFAULT_PREVIOUS_PERIOD_BACKFILL_DAYS = 7
 DEFAULT_COLLECTION_INTERVAL_SECONDS = 86_400
+DEFAULT_HISTORY_EMPTY_STOP_MONTHS = 12
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,9 @@ class Settings:
     previous_period_backfill_days: int = DEFAULT_PREVIOUS_PERIOD_BACKFILL_DAYS
     collection_interval_seconds: int = DEFAULT_COLLECTION_INTERVAL_SECONDS
     collect_on_start: bool = True
+    history_start_period: str | None = None
+    history_end_period: str | None = None
+    history_empty_stop_months: int = DEFAULT_HISTORY_EMPTY_STOP_MONTHS
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -70,4 +74,12 @@ class Settings:
             ),
             collect_on_start=os.getenv("BILLING_COLLECTOR_COLLECT_ON_START", "true").lower()
             in {"1", "true", "yes", "on"},
+            history_start_period=os.getenv("BILLING_COLLECTOR_HISTORY_START_PERIOD") or None,
+            history_end_period=os.getenv("BILLING_COLLECTOR_HISTORY_END_PERIOD") or None,
+            history_empty_stop_months=int(
+                os.getenv(
+                    "BILLING_COLLECTOR_HISTORY_EMPTY_STOP_MONTHS",
+                    str(DEFAULT_HISTORY_EMPTY_STOP_MONTHS),
+                )
+            ),
         )

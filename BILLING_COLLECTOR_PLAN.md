@@ -37,13 +37,12 @@ Documentation references:
 - Scaleway monthly consumption guide: https://www.scaleway.com/en/docs/billing/api-cli/retrieve-monthly-consumption/
 - Scaleway Billing API: https://www.scaleway.com/en/developers/api/billing/
 - Scaleway CLI billing docs: https://cli.scaleway.com/billing/
-- Scaleway Python SDK docs: https://scaleway.github.io/scaleway-sdk-python/
 
-### Python SDK
+### Provider Adapter
 
-The official Scaleway Python SDK module index includes `scaleway.billing.v2beta1`, `scaleway.billing.v2beta1.api`, and `scaleway.billing.v2beta1.types`.
-
-The application should prefer the SDK for Billing v2beta1 if it supports the needed methods cleanly. Wrap the SDK behind an internal adapter so the rest of the application is not coupled to SDK-specific models. If the SDK is missing a feature or has a blocking issue, fall back to a small `httpx` REST adapter with the same internal interface.
+The current implementation uses a small `httpx` REST adapter behind application-owned
+reader ports, so the rest of the application is not coupled to Scaleway-specific
+request or response models.
 
 ### Kubernetes And Observability
 
@@ -305,7 +304,7 @@ scope_type          text not null       -- organization, project, project_catego
 organization_id     text not null
 project_id          text nullable
 category_name       text nullable
-source              text not null       -- scaleway-sdk or scaleway-rest
+source              text not null       -- adapter source, for example scaleway-rest
 raw_json            text not null
 created_at          timestamp not null
 ```
@@ -498,10 +497,11 @@ previous_period_backfill_days = 7
 Define an internal protocol/interface:
 
 ```python
-class BillingClient(Protocol):
+class ProjectReader(Protocol):
     def list_projects(self) -> list[Project]:
         ...
 
+class ConsumptionReader(Protocol):
     def list_consumption(
         self,
         *,
@@ -511,6 +511,7 @@ class BillingClient(Protocol):
     ) -> ConsumptionSnapshot:
         ...
 
+class TaxReader(Protocol):
     def list_taxes(
         self,
         *,
@@ -522,15 +523,15 @@ class BillingClient(Protocol):
 
 Implementations:
 
-- `ScalewaySdkBillingClient`
-- `ScalewayRestBillingClient` fallback
+- `ScalewayRestBillingClient`
 - `FakeBillingClient` for tests
 
-The rest of the app depends only on `BillingClient`.
+The rest of the app depends only on application-owned reader ports.
 
 ## Configuration
 
-Use `pydantic-settings`.
+Configuration is parsed in `billing_collector/config.py` with a small standard-library
+settings object.
 
 Environment variables:
 
@@ -561,28 +562,39 @@ billing_collector/
   __init__.py
   app.py
   config.py
+  cli.py
   domain/
     models.py
     money.py
     fingerprints.py
-  scaleway/
-    client.py
-    sdk_client.py
-    rest_client.py
-  storage/
-    database.py
-    models.py
-    repositories.py
-    migrations.py
-  collection/
-    normalizer.py
     differ.py
-    service.py
-    scheduler.py
-  metrics/
-    collector.py
-    server.py
-  cli.py
+  application/
+    periods.py
+    ports/
+      billing.py
+      repositories.py
+    services/
+      billing_collection_service.py
+      collection_models.py
+      consumption_collection_service.py
+      tax_collection_service.py
+  infrastructure/
+    metrics/
+      prometheus_metrics_renderer.py
+    scaleway/
+      rest_billing_client.py
+    scheduling/
+      interval_scheduler.py
+    sqlite/
+      converters.py
+      database.py
+      daily_delta_repository.py
+      project_repository.py
+      snapshot_repository.py
+      tax_delta_repository.py
+      tax_snapshot_repository.py
+    web/
+      metrics_server.py
 tests/
   test_money.py
   test_fingerprints.py
@@ -598,10 +610,10 @@ tests/
 Each class/module should have one reason to change:
 
 - API clients fetch Scaleway data only.
-- Normalizers convert external data into domain models only.
 - Differ computes deltas only.
-- Repositories persist and query data only.
-- Metrics collector converts stored data to Prometheus metric families only.
+- Application services orchestrate one use case each.
+- Repository adapters persist or project stored data through application-owned ports.
+- Metrics renderer converts counter projections to Prometheus exposition text only.
 - Scheduler triggers collection only.
 
 Avoid "god services" that fetch, normalize, diff, persist, and expose metrics in one class.
@@ -610,28 +622,29 @@ Avoid "god services" that fetch, normalize, diff, persist, and expose metrics in
 
 The collector should be open to extension without rewriting core logic:
 
-- Add a REST client fallback without changing `CollectionService`.
+- Add another billing provider adapter without changing collection services.
 - Add Postgres support without changing the differ.
-- Add more metric families without changing storage writes.
+- Add more metric families behind metric read ports.
 - Add new billing scopes by extending configuration and client adapters.
 
 Use interfaces/protocols at the boundaries.
 
 ### Liskov Substitution Principle
 
-Any implementation of `BillingClient` must behave consistently:
+Any implementation of the billing reader ports must behave consistently:
 
-- `ScalewaySdkBillingClient`, `ScalewayRestBillingClient`, and `FakeBillingClient` return the same domain models.
+- `ScalewayRestBillingClient` and test fakes return the same domain models.
 - Callers should not need to know which implementation they received.
-- Errors should be normalized into application exceptions such as `BillingApiError`, `AuthenticationError`, and `RateLimitError`.
+- Errors should be normalized into application exceptions such as `BillingProviderError`,
+  `BillingProviderAuthenticationError`, and `BillingProviderRateLimitError`.
 
 ### Interface Segregation Principle
 
 Do not force callers to depend on methods they do not use:
 
-- `BillingClient` for Scaleway billing/project reads.
-- `SnapshotRepository` for snapshot persistence.
-- `DeltaRepository` for delta persistence and counter reconstruction queries.
+- `ProjectReader`, `ConsumptionReader`, and `TaxReader` for provider reads.
+- `SnapshotStore`, `DailyDeltaStore`, `TaxSnapshotStore`, and `TaxDeltaStore` for writes.
+- `BillingCounterReader` and `TaxCounterReader` for metric projections.
 - `CollectorStatusRepository` or status service for health state.
 
 Keep interfaces small and purpose-specific.
@@ -640,8 +653,8 @@ Keep interfaces small and purpose-specific.
 
 High-level policy should not depend on low-level details:
 
-- `CollectionService` depends on `BillingClient` and repository protocols, not on SDK classes or SQLAlchemy sessions directly.
-- `MetricsCollector` depends on read repositories, not on ORM internals.
+- Collection services depend on application-owned ports, not Scaleway or SQLite classes.
+- `PrometheusMetricsRenderer` depends on read ports, not SQLite internals.
 - Application composition wires concrete dependencies in `app.py` or `cli.py`.
 
 This keeps business logic testable without Scaleway credentials, Kubernetes, or a real database.
@@ -825,8 +838,7 @@ feature/billing-collector-scaleway-client
 
 Files:
 
-- SDK client
-- REST fallback client if needed
+- REST billing client
 - client adapter tests with mocked responses
 
 Commit guidance:
@@ -837,7 +849,7 @@ feat: add Scaleway billing client adapter
 
 Definition of done:
 
-- SDK integration is isolated.
+- Provider integration is isolated behind application reader ports.
 - Mocked tests do not require real credentials.
 - Pagination is handled.
 
@@ -974,4 +986,3 @@ Before merging implementation:
 
 4. Whether to bootstrap the first snapshot as a delta.
    - Recommendation: no. First snapshot is baseline only.
-

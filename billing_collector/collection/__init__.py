@@ -1,2 +1,0 @@
-"""Collection and diffing services."""
-

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from unittest import TestCase
 
-from billing_collector.collection.differ import SnapshotDiffer
+from billing_collector.domain.differ import SnapshotDiffer
 from billing_collector.domain.models import BillingLine, Snapshot
 
 

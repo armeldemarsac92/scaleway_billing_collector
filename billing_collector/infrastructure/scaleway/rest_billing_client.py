@@ -5,13 +5,13 @@ from typing import Any
 
 import httpx
 
+from billing_collector.application.ports.billing import (
+    BillingProviderAuthenticationError,
+    BillingProviderError,
+    BillingProviderRateLimitError,
+)
 from billing_collector.domain.models import BillingLine, Project, Snapshot, TaxLine, TaxSnapshot
 from billing_collector.domain.money import scaleway_money_to_decimal
-from billing_collector.scaleway.client import (
-    BillingAuthenticationError,
-    BillingClientError,
-    BillingRateLimitError,
-)
 
 
 class ScalewayRestBillingClient:
@@ -147,13 +147,13 @@ class ScalewayRestBillingClient:
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         if response.status_code in {401, 403}:
-            raise BillingAuthenticationError(response.text)
+            raise BillingProviderAuthenticationError(response.text)
         if response.status_code == 429:
-            raise BillingRateLimitError(response.text)
+            raise BillingProviderRateLimitError(response.text)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise BillingClientError(str(exc)) from exc
+            raise BillingProviderError(str(exc)) from exc
 
     def _consumption_line(self, billing_period: str, item: dict[str, Any]) -> BillingLine:
         value = item["value"]

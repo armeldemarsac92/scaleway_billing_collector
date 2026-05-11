@@ -2,14 +2,12 @@ from decimal import Decimal
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from billing_collector.collection.differ import SnapshotDiffer
+from billing_collector.application.ports.repositories import SnapshotScope
+from billing_collector.domain.differ import SnapshotDiffer
 from billing_collector.domain.models import BillingLine, Snapshot
-from billing_collector.storage.database import SQLiteDatabase
-from billing_collector.storage.repositories import (
-    DailyDeltaRepository,
-    SnapshotRepository,
-    SnapshotScope,
-)
+from billing_collector.infrastructure.sqlite.daily_delta_repository import SqliteDailyDeltaRepository
+from billing_collector.infrastructure.sqlite.database import SQLiteDatabase
+from billing_collector.infrastructure.sqlite.snapshot_repository import SqliteSnapshotRepository
 
 
 def _line(**overrides):
@@ -40,8 +38,8 @@ class StorageTests(TestCase):
         self.tmp = TemporaryDirectory()
         self.database = SQLiteDatabase(f"{self.tmp.name}/collector.sqlite3")
         self.database.initialize()
-        self.snapshots = SnapshotRepository(self.database)
-        self.deltas = DailyDeltaRepository(self.database)
+        self.snapshots = SqliteSnapshotRepository(self.database)
+        self.deltas = SqliteDailyDeltaRepository(self.database)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -49,15 +47,23 @@ class StorageTests(TestCase):
     def test_saves_and_loads_previous_snapshot_for_scope(self):
         previous_id = self.snapshots.save(
             _snapshot(_line(value=Decimal("10"))),
-            scope_type="project",
-            organization_id="org-a",
-            project_id="project-a",
+            scope=SnapshotScope(
+                billing_period="2026-04",
+                scope_type="project",
+                organization_id="org-a",
+                project_id="project-a",
+            ),
+            source="test",
         )
         current_id = self.snapshots.save(
             _snapshot(_line(value=Decimal("12"))),
-            scope_type="project",
-            organization_id="org-a",
-            project_id="project-a",
+            scope=SnapshotScope(
+                billing_period="2026-04",
+                scope_type="project",
+                organization_id="org-a",
+                project_id="project-a",
+            ),
+            source="test",
         )
 
         previous = self.snapshots.previous_for_scope(
@@ -78,16 +84,24 @@ class StorageTests(TestCase):
         differ = SnapshotDiffer()
         previous_id = self.snapshots.save(
             _snapshot(_line(value=Decimal("10"))),
-            scope_type="project",
-            organization_id="org-a",
-            project_id="project-a",
+            scope=SnapshotScope(
+                billing_period="2026-04",
+                scope_type="project",
+                organization_id="org-a",
+                project_id="project-a",
+            ),
+            source="test",
         )
         current = _snapshot(_line(value=Decimal("12.50"), billed_quantity=Decimal("125")))
         current_id = self.snapshots.save(
             current,
-            scope_type="project",
-            organization_id="org-a",
-            project_id="project-a",
+            scope=SnapshotScope(
+                billing_period="2026-04",
+                scope_type="project",
+                organization_id="org-a",
+                project_id="project-a",
+            ),
+            source="test",
         )
         previous = self.snapshots.get(previous_id)
         deltas = differ.diff(
@@ -109,21 +123,29 @@ class StorageTests(TestCase):
 
         self.assertEqual(self.deltas.count(), 1)
 
-    def test_counter_values_sum_absolute_credit_values(self):
+    def test_billing_counter_reader_sums_absolute_credit_values(self):
         differ = SnapshotDiffer()
         previous = _snapshot(_line(value=Decimal("10")))
         current = _snapshot(_line(value=Decimal("7.25")))
         previous_id = self.snapshots.save(
             previous,
-            scope_type="project",
-            organization_id="org-a",
-            project_id="project-a",
+            scope=SnapshotScope(
+                billing_period="2026-04",
+                scope_type="project",
+                organization_id="org-a",
+                project_id="project-a",
+            ),
+            source="test",
         )
         current_id = self.snapshots.save(
             current,
-            scope_type="project",
-            organization_id="org-a",
-            project_id="project-a",
+            scope=SnapshotScope(
+                billing_period="2026-04",
+                scope_type="project",
+                organization_id="org-a",
+                project_id="project-a",
+            ),
+            source="test",
         )
 
         self.deltas.upsert_many(
@@ -136,9 +158,8 @@ class StorageTests(TestCase):
             previous_snapshot_id=previous_id,
         )
 
-        counters = self.deltas.counter_values()
+        counters = self.deltas.list_billing_counters()
 
         self.assertEqual(len(counters), 1)
         self.assertEqual(counters[0].kind, "credit")
         self.assertEqual(counters[0].value, Decimal("2.75"))
-
