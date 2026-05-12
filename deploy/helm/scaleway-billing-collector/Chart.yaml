@@ -1,0 +1,6 @@
+apiVersion: v2
+name: scaleway-billing-collector
+description: Scaleway billing collector for Prometheus, Thanos, and Grafana.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

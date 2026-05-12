@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "scaleway-billing-collector.fullname" . }}
+  labels:
+    {{- include "scaleway-billing-collector.labels" . | nindent 4 }}
+data:
+  SCW_API_URL: {{ .Values.config.scwApiUrl | quote }}
+  BILLING_COLLECTOR_DATABASE_PATH: {{ .Values.config.databasePath | quote }}
+  BILLING_COLLECTOR_BIND_HOST: {{ .Values.config.bindHost | quote }}
+  BILLING_COLLECTOR_BIND_PORT: {{ .Values.config.bindPort | quote }}
+  BILLING_COLLECTOR_PROJECT_IDS: {{ .Values.config.projectIds | quote }}
+  BILLING_COLLECTOR_CATEGORY_NAMES: {{ .Values.config.categoryNames | quote }}
+  BILLING_COLLECTOR_PREVIOUS_PERIOD_BACKFILL_DAYS: {{ .Values.config.previousPeriodBackfillDays | quote }}
+  BILLING_COLLECTOR_COLLECTION_INTERVAL_SECONDS: {{ .Values.config.collectionIntervalSeconds | quote }}
+  BILLING_COLLECTOR_COLLECT_ON_START: {{ .Values.config.collectOnStart | quote }}

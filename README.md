@@ -102,7 +102,8 @@ Top-level files and folders:
 
 ```text
 Dockerfile                       container image for the collector runtime
-deploy/kubernetes/               Kubernetes ConfigMap, PVC, Deployment, Service, ServiceMonitor
+deploy/helm/                     Helm chart for Kubernetes deployment
+deploy/kubernetes/               Plain Kubernetes fallback manifests
 docs/grafana-promql.md           extra PromQL examples
 docs/runbook.md                  operational notes
 tests/                           unittest suite with mocked Scaleway responses
@@ -395,7 +396,7 @@ docker run --rm \
   scaleway-billing-collector
 ```
 
-## Kubernetes
+## Kubernetes With Helm
 
 Create the secret:
 
@@ -405,13 +406,15 @@ kubectl -n monitoring create secret generic scaleway-billing-collector \
   --from-literal=SCW_ORGANIZATION_ID='<organization-id>'
 ```
 
-Apply manifests:
+Install or upgrade the Helm release:
 
 ```bash
-kubectl apply -f deploy/kubernetes/scaleway-billing-collector.yaml
+helm upgrade --install scaleway-billing-collector deploy/helm/scaleway-billing-collector \
+  --namespace monitoring \
+  --create-namespace
 ```
 
-The manifest deploys:
+The chart deploys:
 
 - `ConfigMap` with collector settings;
 - `PersistentVolumeClaim` mounted at `/data`;
@@ -421,7 +424,7 @@ The manifest deploys:
 
 The pod security context runs as UID/GID `1000`, drops Linux capabilities, disables privilege escalation, uses a read-only root filesystem, and mounts an `emptyDir` at `/tmp`.
 
-See [deploy/kubernetes/README.md](deploy/kubernetes/README.md) for deployment notes.
+The chart defaults to `replicaCount: 1` and a `Recreate` deployment strategy because SQLite is single-writer. See [deploy/helm/scaleway-billing-collector/README.md](deploy/helm/scaleway-billing-collector/README.md) for chart values and [deploy/kubernetes/README.md](deploy/kubernetes/README.md) for the plain manifest fallback.
 
 ## Tests
 
@@ -436,6 +439,7 @@ python -m unittest discover -s tests -p 'test_*.py'
 Operational docs:
 
 - [Kubernetes deployment](deploy/kubernetes/README.md)
+- [Helm chart](deploy/helm/scaleway-billing-collector/README.md)
 - [Runbook](docs/runbook.md)
 - [Grafana PromQL](docs/grafana-promql.md)
 - [Implementation plan](BILLING_COLLECTOR_PLAN.md)

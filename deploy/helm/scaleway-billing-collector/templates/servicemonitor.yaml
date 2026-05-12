@@ -1,0 +1,26 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "scaleway-billing-collector.fullname" . }}
+  labels:
+    {{- include "scaleway-billing-collector.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  namespaceSelector:
+    {{- if .Values.serviceMonitor.namespaceSelector }}
+    {{- toYaml .Values.serviceMonitor.namespaceSelector | nindent 4 }}
+    {{- else }}
+    matchNames:
+      - {{ .Release.Namespace | quote }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "scaleway-billing-collector.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: {{ .Values.serviceMonitor.path | quote }}
+      interval: {{ .Values.serviceMonitor.interval | quote }}
+{{- end }}

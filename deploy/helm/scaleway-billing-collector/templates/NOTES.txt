@@ -1,0 +1,7 @@
+The Scaleway Billing Collector has been installed.
+
+Metrics endpoint inside the cluster:
+  http://{{ include "scaleway-billing-collector.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/metrics
+
+The collector expects this Secret to exist unless secret.create=true was used:
+  {{ include "scaleway-billing-collector.secretName" . }}
