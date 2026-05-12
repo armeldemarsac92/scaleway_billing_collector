@@ -16,7 +16,7 @@ config:
   projectIds: ""
   categoryNames: ""
   previousPeriodBackfillDays: 7
-  collectionIntervalSeconds: 86400
+  collectionIntervalSeconds: 3600
   collectOnStart: true
 
 secret:

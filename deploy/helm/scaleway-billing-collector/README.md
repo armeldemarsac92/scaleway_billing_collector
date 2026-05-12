@@ -101,7 +101,7 @@ image:
 config:
   projectIds: ""
   categoryNames: ""
-  collectionIntervalSeconds: 86400
+  collectionIntervalSeconds: 3600
   previousPeriodBackfillDays: 7
 
 serviceMonitor:
