@@ -73,8 +73,6 @@ release: kube-prometheus-stack
 
 If your Prometheus Operator uses another selector, override `serviceMonitor.labels`.
 
-By default, `serviceMonitor.interval` is empty and the chart uses `config.collectionIntervalSeconds` with an `s` suffix. With the default collector interval, the rendered scrape interval is `3600s`.
-
 ## Persistence
 
 SQLite is stored on a PVC mounted at `/data`.
@@ -107,7 +105,6 @@ config:
   previousPeriodBackfillDays: 7
 
 serviceMonitor:
-  interval: ""
   labels:
     release: kube-prometheus-stack
 ```

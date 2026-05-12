@@ -1,5 +1,4 @@
 {{- if .Values.serviceMonitor.enabled }}
-{{- $interval := default (printf "%ds" (int .Values.config.collectionIntervalSeconds)) .Values.serviceMonitor.interval }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -23,5 +22,5 @@ spec:
   endpoints:
     - port: metrics
       path: {{ .Values.serviceMonitor.path | quote }}
-      interval: {{ $interval | quote }}
+      interval: {{ .Values.serviceMonitor.interval | quote }}
 {{- end }}

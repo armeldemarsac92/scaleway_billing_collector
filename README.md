@@ -303,7 +303,7 @@ spec:
   endpoints:
     - port: metrics
       path: /metrics
-      interval: 3600s
+      interval: 60s
 ```
 
 The `release: kube-prometheus-stack` label must match the selector used by your Prometheus Operator installation. Change it if your Prometheus stack watches a different label.
@@ -314,13 +314,13 @@ For a Prometheus setup without the Operator, use a scrape config like this:
 scrape_configs:
   - job_name: scaleway-billing-collector
     metrics_path: /metrics
-    scrape_interval: 3600s
+    scrape_interval: 60s
     static_configs:
       - targets:
           - scaleway-billing-collector.monitoring.svc.cluster.local:9503
 ```
 
-By default, the Helm chart renders the `ServiceMonitor` interval from `config.collectionIntervalSeconds`. With the default `3600` second collector interval, Prometheus scrapes every `3600s`. The counter value remains stable between successful collections.
+A `60s` scrape interval is fine even though billing collection runs daily by default. Prometheus needs regular samples of the cumulative counters; the counter value will remain stable between successful collections.
 
 ## Configuration
 
@@ -447,7 +447,7 @@ The chart deploys:
 - `PersistentVolumeClaim` mounted at `/data`;
 - `Deployment` with one collector container;
 - `Service` exposing named port `metrics` on `9503`;
-- `ServiceMonitor` scraping `/metrics` at the collector interval, `3600s` by default.
+- `ServiceMonitor` scraping `/metrics` every `60s`.
 
 The pod security context runs as UID/GID `1000`, drops Linux capabilities, disables privilege escalation, uses a read-only root filesystem, and mounts an `emptyDir` at `/tmp`.
 
