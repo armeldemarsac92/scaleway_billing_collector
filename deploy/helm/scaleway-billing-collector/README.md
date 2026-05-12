@@ -22,6 +22,15 @@ helm upgrade --install scaleway-billing-collector deploy/helm/scaleway-billing-c
   --create-namespace
 ```
 
+Install from the published OCI chart:
+
+```bash
+helm upgrade --install scaleway-billing-collector \
+  oci://ghcr.io/armeldemarsac92/charts/scaleway-billing-collector \
+  --namespace monitoring \
+  --create-namespace
+```
+
 The default release name matches the default Secret name. If you use another release name or Secret name, set:
 
 ```bash
@@ -41,6 +50,18 @@ helm upgrade --install scaleway-billing-collector deploy/helm/scaleway-billing-c
   --set secret.scwSecretKey='<scaleway-secret-key>' \
   --set secret.scwOrganizationId='<organization-id>'
 ```
+
+## Published Artifacts
+
+The GitHub Actions workflow publishes:
+
+- Docker image: `ghcr.io/armeldemarsac92/scaleway_billing_collector`
+- Helm chart: `oci://ghcr.io/armeldemarsac92/charts/scaleway-billing-collector`
+- packaged chart `.tgz` as a workflow artifact
+
+On `main`, the Docker image gets `latest` and `sha-*` tags. The chart version is generated as `<Chart.yaml version>-<run number>.<run attempt>`, for example `0.1.0-42.1`.
+
+On version tags such as `v0.1.0`, the Docker image and Helm chart use the tag version.
 
 ## Prometheus
 

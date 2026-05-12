@@ -1,0 +1,121 @@
+name: Publish Artifacts
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  CHART_PATH: deploy/helm/scaleway-billing-collector
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve package names
+        id: names
+        shell: bash
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "chart_registry=oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python package
+        run: python -m pip install -e .
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint Helm chart
+        run: helm lint "$CHART_PATH"
+
+      - name: Render Helm chart
+        run: helm template scaleway-billing-collector "$CHART_PATH" --namespace monitoring
+
+      - name: Compute Helm chart version
+        id: chart
+        shell: bash
+        run: |
+          base_version="$(awk '/^version:/ {print $2}' "$CHART_PATH/Chart.yaml")"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            chart_version="${GITHUB_REF_NAME#v}"
+            app_version="${GITHUB_REF_NAME#v}"
+          else
+            chart_version="${base_version}-${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+            app_version="${GITHUB_SHA::7}"
+          fi
+          echo "version=$chart_version" >> "$GITHUB_OUTPUT"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
+      - name: Package Helm chart
+        run: |
+          mkdir -p dist
+          helm package "$CHART_PATH" \
+            --destination dist \
+            --version "${{ steps.chart.outputs.version }}" \
+            --app-version "${{ steps.chart.outputs.app_version }}"
+
+      - name: Upload Helm chart artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scaleway-billing-collector-chart
+          path: dist/*.tgz
+          if-no-files-found: error
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.names.outputs.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish Helm chart to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+          helm push dist/*.tgz "${{ steps.names.outputs.chart_registry }}"

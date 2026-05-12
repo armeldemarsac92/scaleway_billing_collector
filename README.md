@@ -396,6 +396,24 @@ docker run --rm \
   scaleway-billing-collector
 ```
 
+## Published Artifacts
+
+GitHub Actions publishes runtime artifacts on pushes to `main`, version tags such as `v0.1.0`, and manual workflow runs.
+
+Docker image:
+
+```text
+ghcr.io/armeldemarsac92/scaleway_billing_collector
+```
+
+Helm chart OCI registry:
+
+```text
+oci://ghcr.io/armeldemarsac92/charts/scaleway-billing-collector
+```
+
+The workflow also uploads the packaged chart `.tgz` as a GitHub Actions artifact.
+
 ## Kubernetes With Helm
 
 Create the secret:
@@ -410,6 +428,15 @@ Install or upgrade the Helm release:
 
 ```bash
 helm upgrade --install scaleway-billing-collector deploy/helm/scaleway-billing-collector \
+  --namespace monitoring \
+  --create-namespace
+```
+
+Install from the published OCI chart:
+
+```bash
+helm upgrade --install scaleway-billing-collector \
+  oci://ghcr.io/armeldemarsac92/charts/scaleway-billing-collector \
   --namespace monitoring \
   --create-namespace
 ```
