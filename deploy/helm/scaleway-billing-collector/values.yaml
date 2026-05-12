@@ -42,7 +42,8 @@ serviceMonitor:
   enabled: true
   labels:
     release: kube-prometheus-stack
-  interval: 60s
+  # Empty means use config.collectionIntervalSeconds with an "s" suffix.
+  interval: ""
   path: /metrics
   namespaceSelector: {}
 
