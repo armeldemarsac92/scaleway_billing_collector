@@ -169,9 +169,4 @@ CREATE TABLE IF NOT EXISTS tax_daily_deltas (
 CREATE INDEX IF NOT EXISTS idx_tax_daily_deltas_counter
 ON tax_daily_deltas (kind, organization_id, description, currency, rate);
 
-CREATE TABLE IF NOT EXISTS collector_state (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
 """

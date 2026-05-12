@@ -12,8 +12,6 @@ from billing_collector.infrastructure.sqlite.converters import (
 )
 from billing_collector.infrastructure.sqlite.database import SQLiteDatabase
 
-HISTORY_SOURCE = "scaleway-rest-history"
-
 
 class SqliteTaxDeltaRepository:
     def __init__(self, database: SQLiteDatabase) -> None:
@@ -78,28 +76,24 @@ class SqliteTaxDeltaRepository:
             rows = connection.execute(
                 """
                 SELECT
-                    tax_daily_deltas.kind,
-                    tax_daily_deltas.organization_id,
-                    tax_daily_deltas.description,
-                    tax_daily_deltas.currency,
-                    tax_daily_deltas.rate,
-                    SUM(ABS(CAST(tax_daily_deltas.delta_euros AS REAL))) AS value
+                    kind,
+                    organization_id,
+                    description,
+                    currency,
+                    rate,
+                    SUM(ABS(CAST(delta_euros AS REAL))) AS value
                 FROM tax_daily_deltas
-                INNER JOIN tax_snapshots
-                    ON tax_snapshots.id = tax_daily_deltas.current_tax_snapshot_id
-                WHERE tax_snapshots.source != ?
                 GROUP BY
-                    tax_daily_deltas.kind,
-                    tax_daily_deltas.organization_id,
-                    tax_daily_deltas.description,
-                    tax_daily_deltas.currency,
-                    tax_daily_deltas.rate
+                    kind,
+                    organization_id,
+                    description,
+                    currency,
+                    rate
                 ORDER BY
-                    tax_daily_deltas.organization_id,
-                    tax_daily_deltas.description,
-                    tax_daily_deltas.kind
-                """,
-                (HISTORY_SOURCE,),
+                    organization_id,
+                    description,
+                    kind
+                """
             ).fetchall()
             return [
                 TaxCounterValue(

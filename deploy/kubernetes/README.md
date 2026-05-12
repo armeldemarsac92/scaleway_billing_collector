@@ -2,10 +2,7 @@
 
 The manifests deploy one collector pod in the `monitoring` namespace, backed by a SQLite PVC and scraped by `kube-prometheus-stack` through a `ServiceMonitor`.
 
-An init container runs `billing-collector-seed-history` before the collector starts. It
-backfills closed historical billing months once, marks the SQLite database after a
-successful seed, and skips later pod starts unless the command is run manually with
-`--force`.
+The collector is Prometheus-first: it starts collecting live month-to-date snapshots when the pod starts, stores daily deltas in SQLite, and exposes cumulative counters from those live deltas. It does not backfill older months.
 
 Create the Scaleway secret before applying the manifests:
 

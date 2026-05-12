@@ -24,7 +24,7 @@ Scaleway Billing API
         v
 scaleway-billing-collector
         |
-        +-- SQLite PVC: raw snapshots, live daily deltas, seeded historical deltas
+        +-- SQLite PVC: raw snapshots and live daily deltas
         |
         +-- /metrics
               |
@@ -40,7 +40,6 @@ scaleway-billing-collector
 
 The Kubernetes deployment is a single long-running pod:
 
-- an init container runs historical seeding before the app starts;
 - the main container optionally collects once on start, then collects on a fixed interval;
 - `/metrics` is scraped by Prometheus;
 - SQLite is stored on a persistent volume;
@@ -78,7 +77,6 @@ billing_collector/
       billing_collection_service.py       orchestration for billing collection
       collection_models.py                internal collection result DTOs
       consumption_collection_service.py   consumption snapshot collection
-      history_seed_service.py             closed-month history seeding
       tax_collection_service.py           organization-level tax collection
 
   infrastructure/
@@ -91,11 +89,10 @@ billing_collector/
     sqlite/
       database.py                         schema creation and connections
       converters.py                       SQLite/domain conversion helpers
-      collector_state_repository.py       one-time markers such as seed state
-      daily_delta_repository.py           live and historical billing deltas
+      daily_delta_repository.py           live billing deltas
       project_repository.py               cached project names
       snapshot_repository.py              raw billing snapshots and lines
-      tax_delta_repository.py             live and historical tax deltas
+      tax_delta_repository.py             live tax deltas
       tax_snapshot_repository.py          raw tax snapshots
     web/
       metrics_server.py                   health, readiness, and metrics HTTP server
@@ -104,8 +101,7 @@ billing_collector/
 Top-level files and folders:
 
 ```text
-Dockerfile                       container image for runtime and init commands
-scripts/seed-history.sh          shell wrapper used by the first-deploy init path
+Dockerfile                       container image for the collector runtime
 deploy/kubernetes/               Kubernetes ConfigMap, PVC, Deployment, Service, ServiceMonitor
 docs/grafana-promql.md           extra PromQL examples
 docs/runbook.md                  operational notes
@@ -127,21 +123,6 @@ Daily live collection does this:
 Positive deltas are exported as cost counters. Negative deltas are exported as credit counters. This keeps all Prometheus series monotonic, so Grafana can safely use `increase()`.
 
 The first snapshot for a billing period is a baseline and does not produce a delta. The first useful live delta appears after the second snapshot for the same billing period and scope.
-
-## Historical Seeding
-
-`billing-collector seed-history` walks closed months backward from the previous billing period and stores month-level deltas. It deliberately skips the current open billing period. A marker in `collector_state` prevents the seed from running twice unless `--force` is passed.
-
-Historical discovery stops when one of these conditions is met:
-
-- `BILLING_COLLECTOR_HISTORY_START_PERIOD` is reached;
-- there are `BILLING_COLLECTOR_HISTORY_EMPTY_STOP_MONTHS` consecutive empty months.
-
-`BILLING_COLLECTOR_HISTORY_END_PERIOD` changes the newest closed period to start from. If it is empty, the service starts from the previous closed billing period.
-
-Because Scaleway only exposes final month-to-date totals for closed months, seeded history is stored on each month's last day. It cannot be reconstructed as true day-by-day usage.
-
-Seeded rows are marked as historical and are excluded from Prometheus counters. This is intentional: Prometheus cannot be backfilled through a scrape endpoint, and including pre-scrape history in counters would make `increase()` lie. Seeded history is kept in SQLite for future reporting/export use.
 
 ## HTTP Endpoints
 
@@ -361,9 +342,6 @@ BILLING_COLLECTOR_CATEGORY_NAMES=
 BILLING_COLLECTOR_PREVIOUS_PERIOD_BACKFILL_DAYS=7
 BILLING_COLLECTOR_COLLECTION_INTERVAL_SECONDS=86400
 BILLING_COLLECTOR_COLLECT_ON_START=true
-BILLING_COLLECTOR_HISTORY_START_PERIOD=
-BILLING_COLLECTOR_HISTORY_END_PERIOD=
-BILLING_COLLECTOR_HISTORY_EMPTY_STOP_MONTHS=12
 ```
 
 `BILLING_COLLECTOR_PROJECT_IDS` and `BILLING_COLLECTOR_CATEGORY_NAMES` are comma-separated lists. Empty means all projects/categories returned by the Scaleway Billing API.
@@ -388,17 +366,6 @@ SCW_ORGANIZATION_ID=... \
 BILLING_COLLECTOR_DATABASE_PATH=./billing-collector.sqlite3 \
 billing-collector collect-once
 ```
-
-Seed closed historical months:
-
-```bash
-SCW_SECRET_KEY=... \
-SCW_ORGANIZATION_ID=... \
-BILLING_COLLECTOR_DATABASE_PATH=./billing-collector.sqlite3 \
-billing-collector seed-history
-```
-
-The command also accepts `--start-period YYYY-MM`, `--end-period YYYY-MM`, `--empty-stop-months N`, and `--force`.
 
 Serve metrics:
 
@@ -428,17 +395,6 @@ docker run --rm \
   scaleway-billing-collector
 ```
 
-Run the historical seed command with the same mounted `/data` volume:
-
-```bash
-docker run --rm \
-  -v "$PWD/data:/data" \
-  -e SCW_SECRET_KEY=... \
-  -e SCW_ORGANIZATION_ID=... \
-  scaleway-billing-collector \
-  billing-collector seed-history
-```
-
 ## Kubernetes
 
 Create the secret:
@@ -459,7 +415,7 @@ The manifest deploys:
 
 - `ConfigMap` with collector settings;
 - `PersistentVolumeClaim` mounted at `/data`;
-- `Deployment` with one `seed-history` init container and one collector container;
+- `Deployment` with one collector container;
 - `Service` exposing named port `metrics` on `9503`;
 - `ServiceMonitor` scraping `/metrics` every `60s`.
 

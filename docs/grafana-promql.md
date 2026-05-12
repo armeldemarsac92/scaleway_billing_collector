@@ -1,9 +1,7 @@
 # Grafana PromQL
 
-These queries assume Grafana queries Prometheus or Thanos.
-
-Historical SQLite seed rows are intentionally excluded from Prometheus counters. These
-queries show live collector time series from the moment Prometheus starts scraping.
+These queries assume Grafana queries Prometheus or Thanos. They show live collector
+time series from the moment Prometheus starts scraping.
 
 ## Net Cost Over Dashboard Range
 

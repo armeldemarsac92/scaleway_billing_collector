@@ -15,9 +15,6 @@ class SettingsTests(TestCase):
                 "BILLING_COLLECTOR_CATEGORY_NAMES": "Compute,Storage",
                 "BILLING_COLLECTOR_BIND_PORT": "9600",
                 "BILLING_COLLECTOR_COLLECT_ON_START": "false",
-                "BILLING_COLLECTOR_HISTORY_START_PERIOD": "2020-01",
-                "BILLING_COLLECTOR_HISTORY_END_PERIOD": "2026-04",
-                "BILLING_COLLECTOR_HISTORY_EMPTY_STOP_MONTHS": "3",
             },
             clear=True,
         ):
@@ -29,9 +26,6 @@ class SettingsTests(TestCase):
         self.assertEqual(settings.category_names, ("Compute", "Storage"))
         self.assertEqual(settings.bind_port, 9600)
         self.assertFalse(settings.collect_on_start)
-        self.assertEqual(settings.history_start_period, "2020-01")
-        self.assertEqual(settings.history_end_period, "2026-04")
-        self.assertEqual(settings.history_empty_stop_months, 3)
 
     def test_settings_reports_missing_required_environment(self):
         with patch.dict("os.environ", {}, clear=True):

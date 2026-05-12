@@ -31,29 +31,3 @@ class CollectionResult:
     deltas_saved: int = 0
     tax_snapshots_saved: int = 0
     tax_deltas_saved: int = 0
-
-
-@dataclass(frozen=True, slots=True)
-class HistorySeedSettings:
-    organization_id: str
-    project_ids: tuple[str, ...] = ()
-    category_names: tuple[str, ...] = ()
-    start_period: str | None = None
-    end_period: str | None = None
-    empty_stop_months: int = 12
-    source: str = "scaleway-rest-history"
-    force: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class HistorySeedResult:
-    skipped: bool = False
-    projects_seen: int = 0
-    periods_checked: int = 0
-    periods_seeded: int = 0
-    snapshots_saved: int = 0
-    deltas_saved: int = 0
-    tax_snapshots_saved: int = 0
-    tax_deltas_saved: int = 0
-    first_seeded_period: str | None = None
-    last_seeded_period: str | None = None

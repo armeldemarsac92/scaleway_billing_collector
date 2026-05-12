@@ -8,8 +8,6 @@ from billing_collector.domain.models import DailyDelta
 from billing_collector.infrastructure.sqlite.converters import decimal_to_text, utc_timestamp
 from billing_collector.infrastructure.sqlite.database import SQLiteDatabase
 
-HISTORY_SOURCE = "scaleway-rest-history"
-
 
 class SqliteDailyDeltaRepository:
     def __init__(self, database: SQLiteDatabase) -> None:
@@ -92,42 +90,38 @@ class SqliteDailyDeltaRepository:
             rows = connection.execute(
                 """
                 SELECT
-                    daily_deltas.kind,
-                    daily_deltas.project_id,
-                    daily_deltas.project_name,
-                    daily_deltas.consumer_id,
-                    daily_deltas.category_name,
-                    daily_deltas.product_name,
-                    daily_deltas.resource_name,
-                    daily_deltas.sku,
-                    daily_deltas.unit,
-                    daily_deltas.currency,
-                    SUM(ABS(CAST(daily_deltas.delta_euros AS REAL))) AS value,
-                    SUM(CAST(daily_deltas.delta_quantity AS REAL)) AS quantity
+                    kind,
+                    project_id,
+                    project_name,
+                    consumer_id,
+                    category_name,
+                    product_name,
+                    resource_name,
+                    sku,
+                    unit,
+                    currency,
+                    SUM(ABS(CAST(delta_euros AS REAL))) AS value,
+                    SUM(CAST(delta_quantity AS REAL)) AS quantity
                 FROM daily_deltas
-                INNER JOIN snapshots
-                    ON snapshots.id = daily_deltas.current_snapshot_id
-                WHERE snapshots.source != ?
                 GROUP BY
-                    daily_deltas.kind,
-                    daily_deltas.project_id,
-                    daily_deltas.project_name,
-                    daily_deltas.consumer_id,
-                    daily_deltas.category_name,
-                    daily_deltas.product_name,
-                    daily_deltas.resource_name,
-                    daily_deltas.sku,
-                    daily_deltas.unit,
-                    daily_deltas.currency
+                    kind,
+                    project_id,
+                    project_name,
+                    consumer_id,
+                    category_name,
+                    product_name,
+                    resource_name,
+                    sku,
+                    unit,
+                    currency
                 ORDER BY
-                    daily_deltas.project_id,
-                    daily_deltas.category_name,
-                    daily_deltas.product_name,
-                    daily_deltas.resource_name,
-                    daily_deltas.sku,
-                    daily_deltas.kind
-                """,
-                (HISTORY_SOURCE,),
+                    project_id,
+                    category_name,
+                    product_name,
+                    resource_name,
+                    sku,
+                    kind
+                """
             ).fetchall()
             return [
                 BillingCounterValue(

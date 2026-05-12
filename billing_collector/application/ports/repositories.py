@@ -116,11 +116,3 @@ class BillingCounterReader(Protocol):
 class TaxCounterReader(Protocol):
     def list_tax_counters(self) -> list[TaxCounterValue]:
         ...
-
-
-class CollectorStateStore(Protocol):
-    def get(self, key: str) -> str | None:
-        ...
-
-    def set(self, key: str, value: str) -> None:
-        ...
