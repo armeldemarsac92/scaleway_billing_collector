@@ -184,7 +184,7 @@ billing_usage_type
 burn_rate_eligible
 ```
 
-Billing taxonomy labels are derived from Scaleway billing metadata:
+Billing taxonomy labels are derived from Scaleway billing metadata to avoid mixing different billing semantics in the same Grafana panel:
 
 ```text
 billing_line_type=resource_usage|subscription|contract|credit|free_tier_marker|unknown
@@ -193,6 +193,20 @@ burn_rate_eligible=true|false
 ```
 
 `billing_line_type` separates real resource usage from commercial lines such as `Subscription`/Gold support and `Contracts`/acceleration agreements. `billing_usage_type` describes the billed unit family. `burn_rate_eligible="true"` is intentionally strict and only applies to runtime units: `minute`, `node_minute`, `ip_minute`, and `hour`.
+
+| Label/value | Meaning | Typical Scaleway fields | Grafana use |
+| --- | --- | --- | --- |
+| `billing_line_type="resource_usage"` | Normal positive usage for resources or usage-based services. | `category_name="Compute"`, `sku="/compute/..."`, `unit="minute"` | Include in selected-range cost and daily cost panels. Include in hourly burn rate only when `burn_rate_eligible="true"`. |
+| `billing_line_type="subscription"` | Subscription or support plan, such as Gold support. These are not hourly resource usage even when the monthly amount changes daily. | `category_name="Subscription"`, `sku="/subscription/support/gold"`, `unit="plan"` | Include in total cost panels. Exclude from hourly burn-rate panels. |
+| `billing_line_type="contract"` | Commercial contract or acceleration agreement adjustment. These can dominate totals and do not map to a running resource. | `category_name="Contracts"`, `sku="/billing/acceleration-agreement/..."`, `unit="EUR"` | Show separately or include in total cost. Exclude from resource-only and hourly burn-rate panels. |
+| `billing_line_type="credit"` | Negative cost line or deducted offer. | negative value, `sku="/offer/deducted/..."`, `unit="currency"` | Subtract from gross costs with `scaleway_billing_credit_euros_total`. |
+| `billing_line_type="free_tier_marker"` | Zero-value plan marker for included/free tiers. | value `0`, `unit="plan"`, product/resource mentions free tier or offer | Usually hide from cost panels. Useful only for explaining why a service appears with zero cost. |
+| `billing_usage_type="runtime"` | Time-metered runtime usage. | `unit="minute"`, `node_minute`, `ip_minute`, or `hour` | Safe basis for hourly burn-rate panels. |
+| `billing_usage_type="capacity"` | Storage/capacity over time. | `unit="gigabyte_hour"` or `gigabyte_minute` | Track as cost over range or daily evolution, not as an hourly compute burn rate. |
+| `billing_usage_type="request"` / `token` | Request, email, serverless, or AI token usage. | `unit="request"`, `gb_s`, `email`, `token` | Track in dedicated usage/cost panels, not generic hourly burn rate. |
+| `billing_usage_type="monthly"` / `plan` / `monetary` / `currency` | Monthly products, support plans, contracts, and monetary adjustments. | `unit="month"`, `plan`, `EUR`, `currency` | Keep out of hourly burn-rate panels. |
+
+The common pitfall is using a generic hourly query on all billing counters. A `499 EUR/month` Gold support plan can appear as a daily delta of about `16 EUR`, and a contract top-up can appear as a large one-off line. Those values are valid costs, but they are misleading if rendered as `EUR/hour` infrastructure burn. Use `burn_rate_eligible="true"` or `billing_line_type="resource_usage"` to keep panels semantically correct.
 
 Tax metric labels:
 
