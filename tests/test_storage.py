@@ -163,3 +163,6 @@ class StorageTests(TestCase):
         self.assertEqual(len(counters), 1)
         self.assertEqual(counters[0].kind, "credit")
         self.assertEqual(counters[0].value, Decimal("2.75"))
+        self.assertEqual(counters[0].billing_line_type, "resource_usage")
+        self.assertEqual(counters[0].billing_usage_type, "runtime")
+        self.assertTrue(counters[0].burn_rate_eligible)

@@ -49,6 +49,17 @@ If a Scaleway month-to-date value decreases, the collector stores a negative del
 
 Dashboards should subtract credits from costs.
 
+## Billing Taxonomy
+
+The collector classifies Scaleway consumption lines before exporting metrics:
+
+- `billing_line_type="resource_usage"` for normal positive usage.
+- `billing_line_type="subscription"` for support or subscription plans such as Gold support.
+- `billing_line_type="contract"` for commercial contract lines such as acceleration agreements.
+- `billing_line_type="credit"` for deducted offers and negative billing lines.
+
+Use `burn_rate_eligible="true"` for hourly burn-rate panels. It is only set for runtime units: `minute`, `node_minute`, `ip_minute`, and `hour`.
+
 ## Useful Commands
 
 Collect once locally or in a pod:
@@ -86,4 +97,3 @@ If Prometheus does not scrape the collector, verify:
 - the ServiceMonitor has label `release=kube-prometheus-stack`;
 - the ServiceMonitor is in namespace `monitoring`;
 - the endpoint port is named `metrics`.
-

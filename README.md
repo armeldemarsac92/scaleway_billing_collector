@@ -63,6 +63,7 @@ billing_collector/
   config.py                      environment parsing and immutable settings
 
   domain/
+    classification.py            Scaleway billing taxonomy classifier
     differ.py                    signed delta computation between snapshots
     fingerprints.py              stable row identity for billing lines
     models.py                    billing, tax, project, snapshot, and delta models
@@ -157,6 +158,10 @@ Metrics:
 ```text
 scaleway_billing_cost_euros_total
 scaleway_billing_credit_euros_total
+scaleway_billing_resource_usage_euros_total
+scaleway_billing_subscription_euros_total
+scaleway_billing_contract_euros_total
+scaleway_billing_free_tier_marker_euros_total
 scaleway_billing_billed_quantity_total
 scaleway_billing_tax_euros_total
 scaleway_billing_tax_credit_euros_total
@@ -174,7 +179,20 @@ resource_name
 sku
 unit
 currency
+billing_line_type
+billing_usage_type
+burn_rate_eligible
 ```
+
+Billing taxonomy labels are derived from Scaleway billing metadata:
+
+```text
+billing_line_type=resource_usage|subscription|contract|credit|free_tier_marker|unknown
+billing_usage_type=runtime|capacity|request|token|monthly|plan|monetary|currency|unknown
+burn_rate_eligible=true|false
+```
+
+`billing_line_type` separates real resource usage from commercial lines such as `Subscription`/Gold support and `Contracts`/acceleration agreements. `billing_usage_type` describes the billed unit family. `burn_rate_eligible="true"` is intentionally strict and only applies to runtime units: `minute`, `node_minute`, `ip_minute`, and `hour`.
 
 Tax metric labels:
 
@@ -189,6 +207,8 @@ Tax metrics are organization-level. The tested Scaleway tax endpoint accepts `bi
 
 ## Grafana Queries
 
+![Grafana dashboard preview](docs/assets/grafana-preview.png)
+
 Create Grafana dashboard variables from Prometheus labels:
 
 ```promql
@@ -196,6 +216,8 @@ label_values(scaleway_billing_cost_euros_total, project_name)
 label_values(scaleway_billing_cost_euros_total, category_name)
 label_values(scaleway_billing_cost_euros_total, product_name)
 label_values(scaleway_billing_cost_euros_total, sku)
+label_values(scaleway_billing_cost_euros_total, billing_line_type)
+label_values(scaleway_billing_cost_euros_total, billing_usage_type)
 ```
 
 Set each variable to support multi-value and include-all. In panel queries, use regex matchers such as `project_name=~"$project"` and `category_name=~"$category"`.
@@ -232,6 +254,30 @@ sum by (category_name) (
 sum by (category_name) (
   increase(scaleway_billing_credit_euros_total{project_name=~"$project"}[$__range])
 )
+```
+
+Runtime hourly burn rate. This excludes monthly plans, contracts, storage capacity units, request/token usage, and free-tier markers:
+
+```promql
+sum(rate(
+  scaleway_billing_resource_usage_euros_total{burn_rate_eligible="true"}[1h]
+)) * 3600
+```
+
+Commercial line split over the selected range:
+
+```promql
+sum by (billing_line_type) (
+  increase(scaleway_billing_cost_euros_total{project_name=~"$project"}[$__range])
+)
+```
+
+Resource-only cost over the selected range:
+
+```promql
+sum(increase(
+  scaleway_billing_cost_euros_total{project_name=~"$project",billing_line_type="resource_usage"}[$__range]
+))
 ```
 
 Product or SKU breakdown:

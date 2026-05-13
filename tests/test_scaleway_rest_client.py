@@ -56,6 +56,9 @@ class ScalewayRestBillingClientTests(TestCase):
         self.assertEqual(len(snapshot.lines), 1)
         self.assertEqual(snapshot.lines[0].value, Decimal("26.22"))
         self.assertEqual(snapshot.lines[0].billed_quantity, Decimal("1324"))
+        self.assertEqual(snapshot.lines[0].billing_line_type, "resource_usage")
+        self.assertEqual(snapshot.lines[0].billing_usage_type, "runtime")
+        self.assertTrue(snapshot.lines[0].burn_rate_eligible)
         self.assertIn("project_id=project-a", str(requests[0].url))
         self.assertIn("category_name=Compute", str(requests[0].url))
 

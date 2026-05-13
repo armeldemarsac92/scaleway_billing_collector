@@ -99,5 +99,7 @@ class ConsumptionCollectionService:
             currency=line.currency,
             value=line.value,
             billed_quantity=line.billed_quantity,
+            billing_line_type=line.billing_line_type,
+            billing_usage_type=line.billing_usage_type,
+            burn_rate_eligible=line.burn_rate_eligible,
         )
-

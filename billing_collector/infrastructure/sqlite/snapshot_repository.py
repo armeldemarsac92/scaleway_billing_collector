@@ -67,10 +67,13 @@ class SqliteSnapshotRepository:
                     currency,
                     value_euros,
                     billed_quantity,
+                    billing_line_type,
+                    billing_usage_type,
+                    burn_rate_eligible,
                     line_fingerprint,
                     raw_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [self._line_params(snapshot_id, line) for line in snapshot.lines],
             )
@@ -141,6 +144,9 @@ class SqliteSnapshotRepository:
             line.currency,
             decimal_to_text(line.value),
             decimal_to_text(line.billed_quantity),
+            line.billing_line_type,
+            line.billing_usage_type,
+            int(bool(line.burn_rate_eligible)),
             line_fingerprint(line),
             "{}",
         )
@@ -178,4 +184,7 @@ class SqliteSnapshotRepository:
             currency=row["currency"],
             value=value,
             billed_quantity=decimal_from_text(row["billed_quantity"]),
+            billing_line_type=row["billing_line_type"],
+            billing_usage_type=row["billing_usage_type"],
+            burn_rate_eligible=bool(row["burn_rate_eligible"]),
         )

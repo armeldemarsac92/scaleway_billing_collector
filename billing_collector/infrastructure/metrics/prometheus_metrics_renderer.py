@@ -25,6 +25,14 @@ class PrometheusMetricsRenderer:
             "# TYPE scaleway_billing_cost_euros_total counter",
             "# HELP scaleway_billing_credit_euros_total Reconstructed cumulative Scaleway billing credits in euros.",
             "# TYPE scaleway_billing_credit_euros_total counter",
+            "# HELP scaleway_billing_resource_usage_euros_total Reconstructed cumulative Scaleway resource usage costs in euros.",
+            "# TYPE scaleway_billing_resource_usage_euros_total counter",
+            "# HELP scaleway_billing_subscription_euros_total Reconstructed cumulative Scaleway subscription costs in euros.",
+            "# TYPE scaleway_billing_subscription_euros_total counter",
+            "# HELP scaleway_billing_contract_euros_total Reconstructed cumulative Scaleway contract costs in euros.",
+            "# TYPE scaleway_billing_contract_euros_total counter",
+            "# HELP scaleway_billing_free_tier_marker_euros_total Reconstructed cumulative Scaleway free-tier marker costs in euros.",
+            "# TYPE scaleway_billing_free_tier_marker_euros_total counter",
             "# HELP scaleway_billing_billed_quantity_total Reconstructed cumulative Scaleway billed quantity.",
             "# TYPE scaleway_billing_billed_quantity_total counter",
             "# HELP scaleway_billing_tax_euros_total Reconstructed cumulative Scaleway organization-level taxes in euros.",
@@ -39,6 +47,12 @@ class PrometheusMetricsRenderer:
                 f"{metric_name}{self._billing_labels(counter)} "
                 f"{self._format_decimal(counter.value)}"
             )
+            typed_metric_name = self._typed_billing_metric_name(counter)
+            if typed_metric_name is not None:
+                lines.append(
+                    f"{typed_metric_name}{self._billing_labels(counter)} "
+                    f"{self._format_decimal(counter.value)}"
+                )
             if counter.quantity is not None and counter.quantity >= 0:
                 lines.append(
                     "scaleway_billing_billed_quantity_total"
@@ -61,6 +75,16 @@ class PrometheusMetricsRenderer:
             return "scaleway_billing_credit_euros_total"
         return "scaleway_billing_cost_euros_total"
 
+    def _typed_billing_metric_name(self, counter: BillingCounterValue) -> str | None:
+        if counter.kind == "credit":
+            return None
+        return {
+            "resource_usage": "scaleway_billing_resource_usage_euros_total",
+            "subscription": "scaleway_billing_subscription_euros_total",
+            "contract": "scaleway_billing_contract_euros_total",
+            "free_tier_marker": "scaleway_billing_free_tier_marker_euros_total",
+        }.get(counter.billing_line_type)
+
     def _billing_labels(self, counter: BillingCounterValue) -> str:
         labels = {
             "project_id": counter.project_id,
@@ -72,6 +96,9 @@ class PrometheusMetricsRenderer:
             "sku": counter.sku,
             "unit": counter.unit,
             "currency": counter.currency,
+            "billing_line_type": counter.billing_line_type,
+            "billing_usage_type": counter.billing_usage_type,
+            "burn_rate_eligible": "true" if counter.burn_rate_eligible else "false",
         }
         return self._render_labels(labels)
 
@@ -100,4 +127,3 @@ class PrometheusMetricsRenderer:
 
     def _format_decimal(self, value: Decimal) -> str:
         return format(value.normalize(), "f")
-

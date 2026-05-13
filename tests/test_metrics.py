@@ -92,9 +92,13 @@ class MetricsTests(TestCase):
         self.assertIn('project_id="project-a"', output)
         self.assertIn('product_name="DEV1 \\"M\\""', output)
         self.assertIn("scaleway_billing_cost_euros_total", output)
+        self.assertIn("scaleway_billing_resource_usage_euros_total", output)
         self.assertIn(" 2.5", output)
         self.assertIn("scaleway_billing_billed_quantity_total", output)
         self.assertIn(" 25", output)
+        self.assertIn('billing_line_type="resource_usage"', output)
+        self.assertIn('billing_usage_type="runtime"', output)
+        self.assertIn('burn_rate_eligible="true"', output)
 
     def test_renders_tax_counters(self):
         previous = TaxSnapshot.now(

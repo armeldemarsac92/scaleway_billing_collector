@@ -40,6 +40,9 @@ class BillingCounterValue:
     sku: str
     unit: str
     currency: str
+    billing_line_type: str
+    billing_usage_type: str
+    burn_rate_eligible: bool
     value: Decimal
     quantity: Decimal | None
 

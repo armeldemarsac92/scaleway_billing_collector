@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from billing_collector.domain.classification import BillingLineClassifier
+
+
+_BILLING_LINE_CLASSIFIER = BillingLineClassifier()
+
 
 @dataclass(frozen=True, slots=True)
 class Project:
@@ -26,6 +31,36 @@ class BillingLine:
     value: Decimal
     billed_quantity: Decimal | None
     project_name: str | None = None
+    billing_line_type: str = ""
+    billing_usage_type: str = ""
+    burn_rate_eligible: bool | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            self.billing_line_type
+            and self.billing_usage_type
+            and self.burn_rate_eligible is not None
+        ):
+            return
+
+        classification = _BILLING_LINE_CLASSIFIER.classify(
+            category_name=self.category_name,
+            product_name=self.product_name,
+            resource_name=self.resource_name,
+            sku=self.sku,
+            unit=self.unit,
+            value=self.value,
+        )
+        if not self.billing_line_type:
+            object.__setattr__(self, "billing_line_type", classification.line_type)
+        if not self.billing_usage_type:
+            object.__setattr__(self, "billing_usage_type", classification.usage_type)
+        if self.burn_rate_eligible is None:
+            object.__setattr__(
+                self,
+                "burn_rate_eligible",
+                classification.burn_rate_eligible,
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +147,9 @@ class DailyDelta:
     delta_quantity: Decimal | None
     line_fingerprint: str
     project_name: str | None = None
+    billing_line_type: str = ""
+    billing_usage_type: str = ""
+    burn_rate_eligible: bool = False
 
     @property
     def kind(self) -> str:

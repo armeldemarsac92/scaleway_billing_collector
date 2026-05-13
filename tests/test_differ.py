@@ -53,6 +53,9 @@ class DifferTests(TestCase):
         self.assertEqual(deltas[0].delta_value, Decimal("2.50"))
         self.assertEqual(deltas[0].delta_quantity, Decimal("25"))
         self.assertEqual(deltas[0].kind, "cost")
+        self.assertEqual(deltas[0].billing_line_type, "resource_usage")
+        self.assertEqual(deltas[0].billing_usage_type, "runtime")
+        self.assertTrue(deltas[0].burn_rate_eligible)
 
     def test_diff_negative_credit(self):
         differ = SnapshotDiffer()

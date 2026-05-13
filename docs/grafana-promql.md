@@ -35,6 +35,34 @@ sum by (category_name) (
 )
 ```
 
+## Runtime Hourly Burn Rate
+
+Only runtime usage is included. Contracts, subscriptions, storage capacity, request/token usage, and free-tier markers are excluded.
+
+```promql
+sum(rate(
+  scaleway_billing_resource_usage_euros_total{burn_rate_eligible="true"}[1h]
+)) * 3600
+```
+
+## Cost By Billing Line Type
+
+Use this to separate real usage from commercial lines such as Gold support or acceleration agreements.
+
+```promql
+sum by (billing_line_type) (
+  increase(scaleway_billing_cost_euros_total[$__range])
+)
+```
+
+## Resource-Only Cost
+
+```promql
+sum(increase(
+  scaleway_billing_cost_euros_total{billing_line_type="resource_usage"}[$__range]
+))
+```
+
 ## Daily Cost Bars By Project
 
 ```promql

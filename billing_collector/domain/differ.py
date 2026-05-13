@@ -66,6 +66,9 @@ class SnapshotDiffer:
                     delta_value=delta_value,
                     delta_quantity=delta_quantity,
                     line_fingerprint=fingerprint,
+                    billing_line_type=reference_line.billing_line_type,
+                    billing_usage_type=reference_line.billing_usage_type,
+                    burn_rate_eligible=bool(reference_line.burn_rate_eligible),
                 )
             )
 

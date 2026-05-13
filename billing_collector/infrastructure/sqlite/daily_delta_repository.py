@@ -38,6 +38,9 @@ class SqliteDailyDeltaRepository:
                     currency,
                     delta_euros,
                     delta_quantity,
+                    billing_line_type,
+                    billing_usage_type,
+                    burn_rate_eligible,
                     kind,
                     line_fingerprint,
                     current_snapshot_id,
@@ -45,12 +48,15 @@ class SqliteDailyDeltaRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(billing_day, billing_period, line_fingerprint, kind)
                 DO UPDATE SET
                     project_name = excluded.project_name,
                     delta_euros = excluded.delta_euros,
                     delta_quantity = excluded.delta_quantity,
+                    billing_line_type = excluded.billing_line_type,
+                    billing_usage_type = excluded.billing_usage_type,
+                    burn_rate_eligible = excluded.burn_rate_eligible,
                     current_snapshot_id = excluded.current_snapshot_id,
                     previous_snapshot_id = excluded.previous_snapshot_id,
                     updated_at = excluded.updated_at
@@ -70,6 +76,9 @@ class SqliteDailyDeltaRepository:
                         delta.currency,
                         decimal_to_text(delta.delta_value),
                         decimal_to_text(delta.delta_quantity),
+                        delta.billing_line_type,
+                        delta.billing_usage_type,
+                        int(delta.burn_rate_eligible),
                         delta.kind,
                         delta.line_fingerprint,
                         current_snapshot_id,
@@ -100,6 +109,9 @@ class SqliteDailyDeltaRepository:
                     sku,
                     unit,
                     currency,
+                    billing_line_type,
+                    billing_usage_type,
+                    burn_rate_eligible,
                     SUM(ABS(CAST(delta_euros AS REAL))) AS value,
                     SUM(CAST(delta_quantity AS REAL)) AS quantity
                 FROM daily_deltas
@@ -113,7 +125,10 @@ class SqliteDailyDeltaRepository:
                     resource_name,
                     sku,
                     unit,
-                    currency
+                    currency,
+                    billing_line_type,
+                    billing_usage_type,
+                    burn_rate_eligible
                 ORDER BY
                     project_id,
                     category_name,
@@ -135,6 +150,9 @@ class SqliteDailyDeltaRepository:
                     sku=row["sku"],
                     unit=row["unit"],
                     currency=row["currency"],
+                    billing_line_type=row["billing_line_type"],
+                    billing_usage_type=row["billing_usage_type"],
+                    burn_rate_eligible=bool(row["burn_rate_eligible"]),
                     value=Decimal(str(row["value"] or 0)),
                     quantity=Decimal(str(row["quantity"])) if row["quantity"] is not None else None,
                 )
