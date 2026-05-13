@@ -472,7 +472,20 @@ Helm chart OCI registry:
 oci://ghcr.io/armeldemarsac92/charts/scaleway-billing-collector
 ```
 
-The workflow also uploads the packaged chart `.tgz` as a GitHub Actions artifact.
+On `main`, the Docker image gets `latest` and `sha-*` tags, and the Helm chart is published with a generated pre-release version such as `0.1.0-42.1`.
+
+On version tags, the workflow publishes stable artifacts and creates a GitHub Release:
+
+```text
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+For a tag `v0.1.0`, the workflow publishes:
+
+- Docker image tags: `v0.1.0` and `0.1.0`
+- Helm chart version: `0.1.0`
+- GitHub Release assets: packaged chart `.tgz` and `.sha256` checksum
 
 ## Kubernetes With Helm
 

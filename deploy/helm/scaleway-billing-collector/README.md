@@ -61,7 +61,17 @@ The GitHub Actions workflow publishes:
 
 On `main`, the Docker image gets `latest` and `sha-*` tags. The chart version is generated as `<Chart.yaml version>-<run number>.<run attempt>`, for example `0.1.0-42.1`.
 
-On version tags such as `v0.1.0`, the Docker image and Helm chart use the tag version.
+On version tags such as `v0.1.0`, the Docker image and Helm chart use the tag version. The workflow also creates a GitHub Release with the packaged chart and a SHA256 checksum attached.
+
+Install a specific released chart version:
+
+```bash
+helm upgrade --install scaleway-billing-collector \
+  oci://ghcr.io/armeldemarsac92/charts/scaleway-billing-collector \
+  --version 0.1.0 \
+  --namespace monitoring \
+  --create-namespace
+```
 
 ## Prometheus
 

@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -82,6 +82,12 @@ jobs:
           path: dist/*.tgz
           if-no-files-found: error
 
+      - name: Generate release checksum
+        if: github.ref_type == 'tag'
+        run: |
+          cd dist
+          sha256sum *.tgz > "scaleway-billing-collector-${{ steps.chart.outputs.version }}.sha256"
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -119,3 +125,39 @@ jobs:
             --username "${{ github.actor }}" \
             --password-stdin
           helm push dist/*.tgz "${{ steps.names.outputs.chart_registry }}"
+
+      - name: Write release notes
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          cat > dist/release-notes.md <<EOF
+          ## Artifacts
+
+          Docker image:
+
+          \`\`\`text
+          ${{ steps.names.outputs.image }}:${{ steps.chart.outputs.version }}
+          \`\`\`
+
+          Helm chart:
+
+          \`\`\`bash
+          helm upgrade --install scaleway-billing-collector \\
+            ${{ steps.names.outputs.chart_registry }}/scaleway-billing-collector \\
+            --version ${{ steps.chart.outputs.version }} \\
+            --namespace monitoring \\
+            --create-namespace
+          \`\`\`
+
+          The packaged Helm chart and its SHA256 checksum are attached to this release.
+          EOF
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: scaleway-billing-collector ${{ steps.chart.outputs.version }}
+          body_path: dist/release-notes.md
+          files: |
+            dist/*.tgz
+            dist/*.sha256
