@@ -140,6 +140,29 @@ class CollectionServiceTests(TestCase):
         self.assertEqual(counters[0].value, Decimal("2.5"))
         self.assertEqual(self.tax_deltas.list_tax_counters()[0].value, Decimal("0.5"))
 
+    def test_collect_accumulates_multiple_intervals_for_same_day(self):
+        settings = CollectionSettings(
+            organization_id="org-a",
+            project_ids=("project-a",),
+            category_names=("Compute",),
+        )
+        self.client.values[("2026-04", "project-a", "Compute")] = Decimal("10")
+        self.client.tax_values["2026-04"] = Decimal("2")
+        self.service.collect(settings=settings, day=date(2026, 4, 28))
+        self.client.values[("2026-04", "project-a", "Compute")] = Decimal("12.50")
+        self.client.tax_values["2026-04"] = Decimal("2.50")
+        self.service.collect(settings=settings, day=date(2026, 4, 28))
+        self.client.values[("2026-04", "project-a", "Compute")] = Decimal("15")
+        self.client.tax_values["2026-04"] = Decimal("3")
+
+        result = self.service.collect(settings=settings, day=date(2026, 4, 28))
+
+        self.assertEqual(result.deltas_saved, 1)
+        self.assertEqual(result.tax_deltas_saved, 1)
+        self.assertEqual(self.deltas.count(), 1)
+        self.assertEqual(self.deltas.list_billing_counters()[0].value, Decimal("5.0"))
+        self.assertEqual(self.tax_deltas.list_tax_counters()[0].value, Decimal("1.0"))
+
     def test_collect_backfills_previous_period_during_first_days(self):
         settings = CollectionSettings(
             organization_id="org-a",

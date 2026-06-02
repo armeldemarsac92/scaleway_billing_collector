@@ -122,6 +122,91 @@ class StorageTests(TestCase):
         )
 
         self.assertEqual(self.deltas.count(), 1)
+        self.assertEqual(self.deltas.list_billing_counters()[0].value, Decimal("2.5"))
+
+    def test_daily_delta_accumulates_collection_intervals_for_same_day(self):
+        differ = SnapshotDiffer()
+        baseline = _snapshot(_line(value=Decimal("10"), billed_quantity=Decimal("100")))
+        first_interval = _snapshot(
+            _line(value=Decimal("12.50"), billed_quantity=Decimal("125"))
+        )
+        second_interval = _snapshot(
+            _line(value=Decimal("15.25"), billed_quantity=Decimal("152.5"))
+        )
+        scope = SnapshotScope(
+            billing_period="2026-04",
+            scope_type="project",
+            organization_id="org-a",
+            project_id="project-a",
+        )
+        baseline_id = self.snapshots.save(baseline, scope=scope, source="test")
+        first_interval_id = self.snapshots.save(first_interval, scope=scope, source="test")
+        second_interval_id = self.snapshots.save(second_interval, scope=scope, source="test")
+
+        self.deltas.upsert_many(
+            differ.diff(
+                billing_day="2026-04-28",
+                current=first_interval,
+                previous=baseline,
+            ),
+            current_snapshot_id=first_interval_id,
+            previous_snapshot_id=baseline_id,
+        )
+        self.deltas.upsert_many(
+            differ.diff(
+                billing_day="2026-04-28",
+                current=second_interval,
+                previous=first_interval,
+            ),
+            current_snapshot_id=second_interval_id,
+            previous_snapshot_id=first_interval_id,
+        )
+
+        counters = self.deltas.list_billing_counters()
+
+        self.assertEqual(self.deltas.count(), 1)
+        self.assertEqual(counters[0].kind, "cost")
+        self.assertEqual(counters[0].value, Decimal("5.25"))
+        self.assertEqual(counters[0].quantity, Decimal("52.5"))
+
+    def test_positive_and_negative_intervals_use_separate_monotonic_counters(self):
+        differ = SnapshotDiffer()
+        baseline = _snapshot(_line(value=Decimal("10")))
+        increased = _snapshot(_line(value=Decimal("12")))
+        corrected = _snapshot(_line(value=Decimal("11")))
+        scope = SnapshotScope(
+            billing_period="2026-04",
+            scope_type="project",
+            organization_id="org-a",
+            project_id="project-a",
+        )
+        baseline_id = self.snapshots.save(baseline, scope=scope, source="test")
+        increased_id = self.snapshots.save(increased, scope=scope, source="test")
+        corrected_id = self.snapshots.save(corrected, scope=scope, source="test")
+
+        self.deltas.upsert_many(
+            differ.diff(
+                billing_day="2026-04-28",
+                current=increased,
+                previous=baseline,
+            ),
+            current_snapshot_id=increased_id,
+            previous_snapshot_id=baseline_id,
+        )
+        self.deltas.upsert_many(
+            differ.diff(
+                billing_day="2026-04-28",
+                current=corrected,
+                previous=increased,
+            ),
+            current_snapshot_id=corrected_id,
+            previous_snapshot_id=increased_id,
+        )
+
+        counters = {counter.kind: counter.value for counter in self.deltas.list_billing_counters()}
+
+        self.assertEqual(counters["cost"], Decimal("2.0"))
+        self.assertEqual(counters["credit"], Decimal("1.0"))
 
     def test_billing_counter_reader_sums_absolute_credit_values(self):
         differ = SnapshotDiffer()

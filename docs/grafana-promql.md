@@ -11,6 +11,32 @@ sum(increase(scaleway_billing_cost_euros_total[$__range]))
 sum(increase(scaleway_billing_credit_euros_total[$__range]))
 ```
 
+## Current Cumulative Collector Total
+
+This shows the net amount collected since the collector's local baseline.
+
+```promql
+sum(scaleway_billing_cost_euros_total)
+-
+sum(scaleway_billing_credit_euros_total)
+```
+
+## Intraday Net Cost Variation
+
+Use this in a time-series panel to see which collection intervals consumed the most.
+The visible precision is bounded by the collector interval and Scaleway's own billing
+update cadence.
+
+```promql
+sum(
+  increase(scaleway_billing_cost_euros_total[$__rate_interval])
+)
+-
+sum(
+  increase(scaleway_billing_credit_euros_total[$__rate_interval])
+)
+```
+
 ## Net Cost By Project
 
 ```promql

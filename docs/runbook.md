@@ -6,7 +6,7 @@ The collector runs as one Kubernetes Deployment replica.
 
 It performs two jobs:
 
-- periodically fetches Scaleway month-to-date billing snapshots and stores local daily deltas in SQLite;
+- periodically fetches Scaleway month-to-date billing snapshots and accumulates interval deltas in SQLite;
 - serves `/metrics`, `/healthz`, and `/readyz` for Prometheus.
 
 SQLite is stored on the `scaleway-billing-collector-data` PVC.
@@ -27,7 +27,7 @@ The Scaleway key should be read-only for billing consumption and project listing
 
 The first snapshot for a billing period is a baseline. It does not produce cost deltas because the collector cannot know how much of the month happened before it started.
 
-The second snapshot for the same billing period produces the first daily deltas.
+The second snapshot for the same billing period produces the first interval deltas. Further collections on the same day are added to that day instead of overwriting previous intervals, which keeps the exported Prometheus counters monotonic.
 
 ## Month Rollover
 

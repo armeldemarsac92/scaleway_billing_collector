@@ -11,7 +11,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="billing-collector")
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("collect-once", help="Fetch Scaleway billing data and store daily deltas")
+    subparsers.add_parser(
+        "collect-once",
+        help="Fetch Scaleway billing data and store interval deltas",
+    )
     subparsers.add_parser("serve", help="Serve /metrics, /healthz, and /readyz")
     return parser
 

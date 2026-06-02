@@ -24,7 +24,7 @@ Scaleway Billing API
         v
 scaleway-billing-collector
         |
-        +-- SQLite PVC: raw snapshots and live daily deltas
+        +-- SQLite PVC: raw snapshots and accumulated interval deltas
         |
         +-- /metrics
               |
@@ -90,10 +90,10 @@ billing_collector/
     sqlite/
       database.py                         schema creation and connections
       converters.py                       SQLite/domain conversion helpers
-      daily_delta_repository.py           live billing deltas
+      daily_delta_repository.py           accumulated billing interval deltas
       project_repository.py               cached project names
       snapshot_repository.py              raw billing snapshots and lines
-      tax_delta_repository.py             live tax deltas
+      tax_delta_repository.py             accumulated tax interval deltas
       tax_snapshot_repository.py          raw tax snapshots
     web/
       metrics_server.py                   health, readiness, and metrics HTTP server
@@ -112,17 +112,17 @@ tests/                           unittest suite with mocked Scaleway responses
 
 ## Collection Model
 
-Daily live collection does this:
+Interval collection does this:
 
 1. Determine the current billing period, for example `2026-05`.
 2. Fetch current month-to-date consumption from Scaleway.
 3. Store the raw snapshot and its billing rows.
 4. Load the previous stored snapshot for the same scope and billing period.
 5. Compute `current month-to-date amount - previous month-to-date amount`.
-6. Store the signed delta for the collection day.
-7. Render cumulative Prometheus counters from stored live deltas.
+6. Add the signed interval delta to the current collection day.
+7. Render cumulative Prometheus counters from stored interval deltas.
 
-Positive deltas are exported as cost counters. Negative deltas are exported as credit counters. This keeps all Prometheus series monotonic, so Grafana can safely use `increase()`.
+Positive deltas are exported as cost counters. Negative deltas are exported as credit counters. The collector accumulates repeated collections for the same day instead of overwriting them, so the exported Prometheus series remain monotonic while the counter value changes at each successful collection interval.
 
 The first snapshot for a billing period is a baseline and does not produce a delta. The first useful live delta appears after the second snapshot for the same billing period and scope.
 
@@ -151,7 +151,7 @@ There is currently no JSON stats API. Grafana should query Prometheus for live t
 
 The collector stores signed deltas internally but exposes cumulative counters.
 
-Do not use `sum_over_time()` on these metrics for billing totals. Prometheus scrapes the same counter value many times between daily collections, so `sum_over_time()` would overcount. Use `increase()` over the Grafana-selected range.
+Do not use `sum_over_time()` on these metrics for billing totals. Prometheus scrapes the same counter value many times between collector runs, so `sum_over_time()` would overcount. Use `increase()` over the Grafana-selected range.
 
 Metrics:
 
@@ -244,6 +244,18 @@ sum(increase(scaleway_billing_cost_euros_total{project_name=~"$project",category
 sum(increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[$__range]))
 ```
 
+Intraday net cost variation for a Time series panel:
+
+```promql
+sum(
+  increase(scaleway_billing_cost_euros_total{project_name=~"$project",category_name=~"$category"}[$__rate_interval])
+)
+-
+sum(
+  increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[$__rate_interval])
+)
+```
+
 Daily cost evolution for a Time series or Bar chart panel:
 
 ```promql
@@ -256,7 +268,7 @@ sum by (project_name) (
 )
 ```
 
-For the daily panel, set the panel interval or minimum step to `1d`. The collector updates once per day by default, so smaller steps usually add visual noise without adding billing precision.
+For daily bars, set the panel interval or minimum step to `1d`. For intraday variation, use a shorter range vector such as `1h` or `$__rate_interval`; the graph precision is bounded by `BILLING_COLLECTOR_COLLECTION_INTERVAL_SECONDS` and Scaleway's billing update cadence.
 
 Category breakdown over the selected range:
 
@@ -380,7 +392,7 @@ scrape_configs:
           - scaleway-billing-collector.monitoring.svc.cluster.local:9503
 ```
 
-A `60s` scrape interval is fine even though billing collection runs daily by default. Prometheus needs regular samples of the cumulative counters; the counter value will remain stable between successful collections.
+A `60s` scrape interval is fine even though billing collection runs less often by default. Prometheus needs regular samples of the cumulative counters; the counter value remains stable between successful collections and increases when a new interval delta is recorded.
 
 ## Configuration
 
