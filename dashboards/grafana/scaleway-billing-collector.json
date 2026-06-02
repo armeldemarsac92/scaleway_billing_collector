@@ -1,0 +1,386 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "KbqIZU74k"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#ffffff00",
+            "mode": "palette-classic-by-name"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 5,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": true,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "  sum(increase(scaleway_billing_cost_euros_total{\n    project_name=~\"${project_name:regex}\",\n    category_name=~\"${category_name:regex}\",\n    product_name=~\"${product_name:regex}\",\n    unit!~\"EUR|plan|currency\",\n    billing_line_type=\"resource_usage\",\n    burn_rate_eligible=~\"${burn_rate:raw}\"\n  }[$__range]))\n",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Resource usage cost from ${__from:date:HH:mm:ss} to ${__to:date:HH:mm:ss}",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bflud2y9t3uv4c"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 19,
+        "x": 5,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bflud2y9t3uv4c"
+          },
+          "editorMode": "code",
+          "expr": "sum by (project_name, category_name, product_name, resource_name, sku, unit, billing_usage_type, burn_rate_eligible) (\n  increase(scaleway_billing_cost_euros_total{\n    project_name=~\"${project_name:regex}\",\n    category_name=~\"${category_name:regex}\",\n    product_name=~\"${product_name:regex}\",\n    unit!~\"EUR|plan|currency\",\n    billing_line_type=\"resource_usage\",\n    burn_rate_eligible=~\"${burn_rate:raw}\"\n  }[$__range])\n) > 0",
+          "legendFormat": "{{project_name}} / {{category_name}} / {{product_name}} / {{resource_name}} / {{unit}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Resource usage cost by product from ${__from:date:HH:mm:ss} to ${__to:date:HH:mm:ss}",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bflud2y9t3uv4c"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 2,
+              "type": "symlog"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 3,
+      "interval": "1h",
+      "maxDataPoints": 10000,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bflud2y9t3uv4c"
+          },
+          "editorMode": "code",
+          "expr": "sum by (project_name, category_name, product_name, resource_name, unit, billing_usage_type, burn_rate_eligible) (\n  increase(scaleway_billing_cost_euros_total{\n    project_name=~\"${project_name:regex}\",\n    category_name=~\"${category_name:regex}\",\n    product_name=~\"${product_name:regex}\",\n    unit!~\"EUR|plan|currency\",\n    billing_line_type=\"resource_usage\",\n    burn_rate_eligible=~\"${burn_rate:raw}\"\n  }[1h])\n) > 0",
+          "interval": "",
+          "legendFormat": "{{project_name}} / {{category_name}} / {{product_name}} / {{resource_name}} / {{unit}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Hourly resource usage cost from ${__from:date:HH:mm:ss} to ${__to:date:HH:mm:ss}",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bflud2y9t3uv4c"
+        },
+        "definition": "label_values(scaleway_billing_cost_euros_total,project_name)",
+        "includeAll": true,
+        "label": "Project name",
+        "multi": true,
+        "name": "project_name",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(scaleway_billing_cost_euros_total,project_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": [
+            "Compute"
+          ],
+          "value": [
+            "Compute"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "KbqIZU74k"
+        },
+        "definition": "label_values(scaleway_billing_cost_euros_total{project_name=~\"${project_name:regex}\"},category_name)",
+        "includeAll": true,
+        "label": "Category",
+        "multi": true,
+        "name": "category_name",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(scaleway_billing_cost_euros_total{project_name=~\"${project_name:regex}\"},category_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bflud2y9t3uv4c"
+        },
+        "definition": "label_values(scaleway_billing_cost_euros_total{project_name=~\"${project_name:regex}\",category_name=~\"${category_name:regex}\"},product_name)",
+        "includeAll": true,
+        "label": "Product name",
+        "multi": true,
+        "name": "product_name",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(scaleway_billing_cost_euros_total{project_name=~\"${project_name:regex}\",category_name=~\"${category_name:regex}\"},product_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "true",
+          "value": "true"
+        },
+        "description": "Use true for runtime-only burn-rate panels, or true|false to include storage and capacity resources.",
+        "label": "Burn-rate filter",
+        "name": "burn_rate",
+        "options": [
+          {
+            "text": "true|false",
+            "value": "true|false"
+          },
+          {
+            "text": "true",
+            "value": "true"
+          }
+        ],
+        "type": "switch"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Scaleway realtime costs",
+  "uid": "arh8q7p",
+  "version": 1,
+  "weekStart": ""
+}

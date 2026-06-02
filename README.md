@@ -103,6 +103,7 @@ Top-level files and folders:
 
 ```text
 Dockerfile                       container image for the collector runtime
+dashboards/grafana/              exported Grafana dashboard JSON files
 deploy/helm/                     Helm chart for Kubernetes deployment
 deploy/kubernetes/               Plain Kubernetes fallback manifests
 docs/grafana-promql.md           extra PromQL examples
@@ -223,6 +224,8 @@ Tax metrics are organization-level. The tested Scaleway tax endpoint accepts `bi
 
 ![Grafana dashboard preview](docs/assets/grafana-preview.png)
 
+The exported dashboard JSON lives in [dashboards/grafana/scaleway-billing-collector.json](dashboards/grafana/scaleway-billing-collector.json).
+
 Create Grafana dashboard variables from Prometheus labels:
 
 ```promql
@@ -234,123 +237,88 @@ label_values(scaleway_billing_cost_euros_total, billing_line_type)
 label_values(scaleway_billing_cost_euros_total, billing_usage_type)
 ```
 
-Set each variable to support multi-value and include-all. In panel queries, use regex matchers such as `project_name=~"$project"` and `category_name=~"$category"`.
-
-Selected-range net cost for a Stat panel:
+Set each variable to support multi-value and include-all. In panel queries, use Grafana's regex formatter:
 
 ```promql
-sum(increase(scaleway_billing_cost_euros_total{project_name=~"$project",category_name=~"$category"}[$__range]))
--
-sum(increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[$__range]))
+project_name=~"${project_name:regex}"
+category_name=~"${category_name:regex}"
+product_name=~"${product_name:regex}"
 ```
 
-Intraday net cost variation for a Time series panel:
+For an include/exclude non burn-rate eligible switch, create a custom variable named `burn_rate` with values `true` and `true|false`, then use the raw formatter:
 
 ```promql
-sum(
-  increase(scaleway_billing_cost_euros_total{project_name=~"$project",category_name=~"$category"}[$__rate_interval])
-)
--
-sum(
-  increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[$__rate_interval])
-)
+burn_rate_eligible=~"${burn_rate:raw}"
 ```
 
-Daily cost evolution for a Time series or Bar chart panel:
+Use different query shapes for different Grafana panels:
+
+| Panel type | Use it for | Query shape |
+| --- | --- | --- |
+| Stat | One selected-range total | `sum(increase(metric[$__range]))` |
+| Time series | Hourly evolution | `sum by (...) (increase(metric[1h]))` with a `1h` minimum interval |
+| Bar chart | Daily evolution | `sum by (...) (increase(metric[1d]))` with a `1d` minimum interval |
+| Bar gauge / table | Selected-range breakdown | `sum by (project_name, category_name, product_name, resource_name, ...) (increase(metric[$__range]))` |
+| Runtime burn-rate | Runtime-only hourly cost | `increase(scaleway_billing_resource_usage_euros_total{burn_rate_eligible="true"}[1h])` |
+
+Selected-range resource usage cost for a Stat panel:
 
 ```promql
-sum by (project_name) (
-  increase(scaleway_billing_cost_euros_total{project_name=~"$project",category_name=~"$category"}[1d])
-)
--
-sum by (project_name) (
-  increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[1d])
-)
+sum(increase(scaleway_billing_cost_euros_total{
+  project_name=~"${project_name:regex}",
+  category_name=~"${category_name:regex}",
+  product_name=~"${product_name:regex}",
+  billing_line_type="resource_usage",
+  burn_rate_eligible=~"${burn_rate:raw}"
+}[$__range]))
 ```
 
-For daily bars, set the panel interval or minimum step to `1d`. For intraday variation, use a shorter range vector such as `1h` or `$__rate_interval`; the graph precision is bounded by `BILLING_COLLECTOR_COLLECTION_INTERVAL_SECONDS` and Scaleway's billing update cadence.
-
-Category breakdown over the selected range:
+Hourly resource usage cost for a Time series panel:
 
 ```promql
-sum by (category_name) (
-  increase(scaleway_billing_cost_euros_total{project_name=~"$project"}[$__range])
-)
--
-sum by (category_name) (
-  increase(scaleway_billing_credit_euros_total{project_name=~"$project"}[$__range])
-)
+sum by (
+  project_name,
+  category_name,
+  product_name,
+  resource_name,
+  unit,
+  billing_usage_type,
+  burn_rate_eligible
+) (
+  increase(scaleway_billing_cost_euros_total{
+    project_name=~"${project_name:regex}",
+    category_name=~"${category_name:regex}",
+    product_name=~"${product_name:regex}",
+    billing_line_type="resource_usage",
+    burn_rate_eligible=~"${burn_rate:raw}"
+  }[1h])
+) > 0
 ```
 
-Runtime hourly burn rate. This excludes monthly plans, contracts, storage capacity units, request/token usage, and free-tier markers:
+Selected-range detail for a Bar gauge or Table panel:
 
 ```promql
-sum(rate(
-  scaleway_billing_resource_usage_euros_total{burn_rate_eligible="true"}[1h]
-)) * 3600
+sum by (
+  project_name,
+  category_name,
+  product_name,
+  resource_name,
+  sku,
+  unit,
+  billing_usage_type,
+  burn_rate_eligible
+) (
+  increase(scaleway_billing_cost_euros_total{
+    project_name=~"${project_name:regex}",
+    category_name=~"${category_name:regex}",
+    product_name=~"${product_name:regex}",
+    billing_line_type="resource_usage",
+    burn_rate_eligible=~"${burn_rate:raw}"
+  }[$__range])
+) > 0
 ```
 
-Commercial line split over the selected range:
-
-```promql
-sum by (billing_line_type) (
-  increase(scaleway_billing_cost_euros_total{project_name=~"$project"}[$__range])
-)
-```
-
-Resource-only cost over the selected range:
-
-```promql
-sum(increase(
-  scaleway_billing_cost_euros_total{project_name=~"$project",billing_line_type="resource_usage"}[$__range]
-))
-```
-
-Product or SKU breakdown:
-
-```promql
-sum by (product_name, sku) (
-  increase(scaleway_billing_cost_euros_total{project_name=~"$project",category_name=~"$category"}[$__range])
-)
--
-sum by (product_name, sku) (
-  increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[$__range])
-)
-```
-
-Billed quantity:
-
-```promql
-sum by (product_name, sku, unit) (
-  increase(scaleway_billing_billed_quantity_total{project_name=~"$project"}[$__range])
-)
-```
-
-Net tax over the selected range:
-
-```promql
-sum(increase(scaleway_billing_tax_euros_total[$__range]))
--
-sum(increase(scaleway_billing_tax_credit_euros_total[$__range]))
-```
-
-Gross cost over the selected range:
-
-```promql
-(
-  sum(increase(scaleway_billing_cost_euros_total{project_name=~"$project",category_name=~"$category"}[$__range]))
-  -
-  sum(increase(scaleway_billing_credit_euros_total{project_name=~"$project",category_name=~"$category"}[$__range]))
-)
-+
-(
-  sum(increase(scaleway_billing_tax_euros_total[$__range]))
-  -
-  sum(increase(scaleway_billing_tax_credit_euros_total[$__range]))
-)
-```
-
-More examples are available in [docs/grafana-promql.md](docs/grafana-promql.md).
+Use `> 0` to hide zero-value series. More panel-specific examples are available in [docs/grafana-promql.md](docs/grafana-promql.md).
 
 ## Prometheus Setup
 
